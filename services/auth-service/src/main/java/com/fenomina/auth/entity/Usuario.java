@@ -3,19 +3,16 @@ package com.fenomina.auth.entity;
 import com.fenomina.auth.enums.RolUsuario;
 import jakarta.persistence.*;
 import lombok.*;
-import org.hibernate.envers.Audited;
 import org.springframework.data.annotation.CreatedBy;
 import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.LastModifiedBy;
 import org.springframework.data.annotation.LastModifiedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
-
 import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "usuario", schema = "auth")
 @EntityListeners(AuditingEntityListener.class)
-@Audited // Hibernate Envers crea automáticamente tabla usuarios_aud
 @Getter
 @Setter
 @NoArgsConstructor
