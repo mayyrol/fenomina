@@ -56,7 +56,14 @@ public class UsuarioServiceImpl implements UsuarioService {
                 .fkIdEmpresa(dto.getFkIdEmpresa())
                 .estadoUsuario(true)
                 .intentosFallidosLogin(0)
+                .createdAt(LocalDateTime.now())
                 .build();
+        try {
+            Usuario usuarioCreador = obtenerUsuarioActual();
+            usuario.setCreatedBy(usuarioCreador.getUsuarioId());
+        } catch (Exception e) {
+            // Si no hay usuario autenticado (usuario maestro inicial), dejar null
+        }
 
         Usuario usuarioGuardado = usuarioRepository.save(usuario);
 
@@ -96,10 +103,9 @@ public class UsuarioServiceImpl implements UsuarioService {
     public UsuarioResponseDTO actualizarUsuario(Long id, ActualizarUsuarioRequestDTO dto, String ipAddress) {
         Usuario usuario = obtenerUsuarioPorId(id);
 
-        // Construir string con los cambios realizados
         StringBuilder cambios = new StringBuilder();
 
-        // Actualizar campos si vienen en el DTO
+        // Actualizar campos
         if (dto.getNombresUsuario() != null && !dto.getNombresUsuario().equals(usuario.getNombresUsuario())) {
             cambios.append("nombres: ").append(usuario.getNombresUsuario())
                     .append(" → ").append(dto.getNombresUsuario()).append("; ");
@@ -130,10 +136,14 @@ public class UsuarioServiceImpl implements UsuarioService {
             usuario.setFkIdEmpresa(dto.getFkIdEmpresa());
         }
 
+        usuario.setUpdatedAt(LocalDateTime.now());
+
+        Usuario usuarioEditor = obtenerUsuarioActual();
+        usuario.setUpdatedBy(usuarioEditor.getUsuarioId());
+
         Usuario usuarioActualizado = usuarioRepository.save(usuario);
 
         // Registrar en auditoría
-        Usuario usuarioEditor = obtenerUsuarioActual();
         auditLogService.registrarActualizacionUsuario(
                 usuarioEditor,
                 usuarioActualizado,
@@ -145,7 +155,6 @@ public class UsuarioServiceImpl implements UsuarioService {
 
         return usuarioMapper.toResponseDTO(usuarioActualizado);
     }
-
     @Override
     public UsuarioResponseDTO obtenerUsuarioDTOPorId(Long id) {
         Usuario usuario = obtenerUsuarioPorId(id);
