@@ -8,10 +8,6 @@ import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
 
-/**
- * DTO de respuesta con información de usuario.
- * NO incluye la contraseña por seguridad.
- */
 @Data
 @Builder
 @NoArgsConstructor
@@ -29,4 +25,7 @@ public class UsuarioResponseDTO {
     private Boolean estadoUsuario;
     private LocalDateTime ultimoLogin;
     private LocalDateTime createdAt;
+    private Boolean bloqueadoLogin;
+    private Integer intentosFallidosLogin;
+    private LocalDateTime fechaBloqueo;
 }

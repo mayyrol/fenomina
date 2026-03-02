@@ -50,6 +50,14 @@ public class AuthException extends RuntimeException {
         );
     }
 
+    public static AuthException usuarioInactivo() {
+        return new AuthException(
+                "Usuario inactivo. Contacte al administrador para activar su cuenta.",
+                HttpStatus.FORBIDDEN,
+                "AUTH_009"
+        );
+    }
+
     public static AuthException tokenInvalido() {
         return new AuthException(
                 "Token inválido o expirado. Por favor, inicie sesión nuevamente.",

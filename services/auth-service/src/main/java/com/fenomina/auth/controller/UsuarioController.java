@@ -110,20 +110,53 @@ public class UsuarioController {
     }
 
     /**
-     * Desbloquear un usuario manualmente.
+     * Activa un usuario (lo habilita para login)
      */
-    @PatchMapping("/{id}/desbloquear")
+    @PatchMapping("/{id}/activar")
     @PreAuthorize("hasRole('SUPER_ADMIN')")
-    public ResponseEntity<MessageResponseDTO> desbloquearUsuario(
+    public ResponseEntity<MessageResponseDTO> activarUsuario(
             @PathVariable Long id,
             HttpServletRequest request) {
 
         String ipAddress = IpUtils.getClientIp(request);
+        log.info("Activando usuario ID: {} desde IP: {}", id, ipAddress);
 
-        log.info("Desbloqueando usuario ID: {} desde IP: {}", id, ipAddress);
+        usuarioService.activarUsuario(id, ipAddress);
 
-        usuarioService.desbloquearUsuario(id, ipAddress);
+        return ResponseEntity.ok(new MessageResponseDTO("Usuario activado exitosamente"));
+    }
 
-        return ResponseEntity.ok(new MessageResponseDTO("Usuario desbloqueado exitosamente"));
+    /**
+     * Inactiva un usuario (lo deshabilita para login)
+     */
+    @PatchMapping("/{id}/inactivar")
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
+    public ResponseEntity<MessageResponseDTO> inactivarUsuario(
+            @PathVariable Long id,
+            HttpServletRequest request) {
+
+        String ipAddress = IpUtils.getClientIp(request);
+        log.info("Inactivando usuario ID: {} desde IP: {}", id, ipAddress);
+
+        usuarioService.inactivarUsuario(id, ipAddress);
+
+        return ResponseEntity.ok(new MessageResponseDTO("Usuario inactivado exitosamente"));
+    }
+
+    /**
+     * Desbloquea el login de un usuario (resetea intentos fallidos)
+     */
+    @PatchMapping("/{id}/desbloquear-login")
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
+    public ResponseEntity<MessageResponseDTO> desbloquearLogin(
+            @PathVariable Long id,
+            HttpServletRequest request) {
+
+        String ipAddress = IpUtils.getClientIp(request);
+        log.info("Desbloqueando login de usuario ID: {} desde IP: {}", id, ipAddress);
+
+        usuarioService.desbloquearLoginUsuario(id, ipAddress);
+
+        return ResponseEntity.ok(new MessageResponseDTO("Login desbloqueado exitosamente"));
     }
 }

@@ -13,14 +13,6 @@ import java.util.List;
  */
 public interface UsuarioService {
 
-    /**
-     * Crea un nuevo usuario en el sistema.
-     * Solo puede ser ejecutado por un SUPER_ADMIN.
-     *
-     * @param dto Datos del usuario a crear
-     * @param ipAddress IP desde donde se crea
-     * @return UsuarioResponseDTO con los datos del usuario creado
-     */
     UsuarioResponseDTO crearUsuario(RegistroUsuarioRequestDTO dto, String ipAddress);
 
     Usuario obtenerUsuarioPorUsername(String username);
@@ -35,13 +27,15 @@ public interface UsuarioService {
 
     void eliminarUsuario(Long id, String ipAddress);
 
-    void desbloquearUsuario(Long id, String ipAddress);
-
     boolean existeUsername(String username);
 
     boolean existeNumeroIdentificacion(String numIdentificacion);
 
-    void intentarDesbloqueoAutomatico(Usuario usuario);
-
     void guardarUsuario(Usuario usuario);
+
+    void activarUsuario(Long id, String ipAddress);
+
+    void inactivarUsuario(Long id, String ipAddress);
+
+    void desbloquearLoginUsuario(Long id, String ipAddress);
 }

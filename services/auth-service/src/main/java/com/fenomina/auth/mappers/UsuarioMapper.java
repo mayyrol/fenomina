@@ -11,10 +11,6 @@ import org.springframework.stereotype.Component;
 @Component
 public class UsuarioMapper {
 
-    /**
-     * Convierte Usuario (entidad) a UsuarioResponseDTO.
-     * Excluye la contraseña por seguridad.
-     */
     public UsuarioResponseDTO toResponseDTO(Usuario usuario) {
         if (usuario == null) {
             return null;
@@ -30,6 +26,9 @@ public class UsuarioMapper {
                 .rolUsuario(usuario.getRolUsuario())
                 .fkIdEmpresa(usuario.getFkIdEmpresa())
                 .estadoUsuario(usuario.getEstadoUsuario())
+                .bloqueadoLogin(usuario.getBloqueadoLogin())
+                .intentosFallidosLogin(usuario.getIntentosFallidosLogin())
+                .fechaBloqueo(usuario.getFechaBloqueo())
                 .ultimoLogin(usuario.getUltimoLogin())
                 .createdAt(usuario.getCreatedAt())
                 .build();

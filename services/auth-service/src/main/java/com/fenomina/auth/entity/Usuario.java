@@ -53,7 +53,12 @@ public class Usuario {
     @Column(name = "estado_usuario", nullable = false)
     private Boolean estadoUsuario = true;
 
+    @Column(name = "bloqueado_login", nullable = false)
+    @Builder.Default
+    private Boolean bloqueadoLogin = false; // Bloqueado por login fallido
+
     @Column(name = "intentos_fallidos_login")
+    @Builder.Default
     private Integer intentosFallidosLogin = 0;
 
     @Column(name = "fecha_bloqueo")
@@ -82,35 +87,57 @@ public class Usuario {
     @Column(name = "deleted_at")
     private LocalDateTime deletedAt;
 
-    // Métodos de negocio
-    public void incrementarIntentosLogin() {
-        this.intentosFallidosLogin++;
-    }
-
-    public void resetearIntentosLogin() {
-        this.intentosFallidosLogin = 0;
-        this.fechaBloqueo = null;
-    }
-
+    //eliminar luego ****
     public void bloquear() {
         this.estadoUsuario = false;
         this.fechaBloqueo = LocalDateTime.now();
     }
 
+    public void incrementarIntentosLogin() {
+        this.intentosFallidosLogin++;
+        if (this.intentosFallidosLogin >= 5) {
+            bloquearPorIntentosLogin();
+        }
+    }
+
+    public void resetearIntentosLogin() {
+        this.intentosFallidosLogin = 0;
+        this.bloqueadoLogin = false;
+        this.fechaBloqueo = null;
+    }
+
+    private void bloquearPorIntentosLogin() {
+        this.bloqueadoLogin = true;
+        this.fechaBloqueo = LocalDateTime.now();
+    }
+
     public boolean puedeDesbloquearseAutomaticamente() {
-        if (fechaBloqueo == null || estadoUsuario) {
+        if (fechaBloqueo == null || !bloqueadoLogin) {
             return false;
         }
         return fechaBloqueo.plusMinutes(15).isBefore(LocalDateTime.now());
     }
 
-    public void desbloquear() {
-        this.estadoUsuario = true;
+    public void desbloquearLogin() {
+        this.bloqueadoLogin = false;
         this.intentosFallidosLogin = 0;
         this.fechaBloqueo = null;
     }
 
-    public boolean estaActivo() {
-        return estadoUsuario && deletedAt == null;
+    public void activar() {
+        this.estadoUsuario = true;
     }
+
+    public void inactivar() {
+        this.estadoUsuario = false;
+    }
+
+    public boolean puedeHacerLogin() {
+        return estadoUsuario && !bloqueadoLogin && deletedAt == null;
+    }
+
+    public boolean estaActivo() {
+        return deletedAt == null;
+    }
+
 }

@@ -15,6 +15,8 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
+
 /**
  * Implementación del servicio de autenticación.
  */
@@ -34,35 +36,57 @@ public class AuthServiceImpl implements AuthService {
     @Override
     @Transactional
     public AuthResponseDTO login(LoginRequestDTO loginRequest, String ipAddress, String userAgent) {
+        // Buscar usuario
         Usuario usuario = usuarioService.obtenerUsuarioPorUsername(loginRequest.getUserName());
 
-        usuarioService.intentarDesbloqueoAutomatico(usuario);
+        if (usuario.puedeDesbloquearseAutomaticamente()) {
+            usuario.desbloquearLogin();
+            usuarioService.guardarUsuario(usuario);
+            log.info("Usuario desbloqueado automáticamente: {}", usuario.getUserName());
+        }
 
         if (!usuario.estaActivo()) {
             auditLogService.registrarLoginFallido(
                     loginRequest.getUserName(),
                     ipAddress,
                     userAgent,
-                    "Usuario bloqueado"
+                    "Usuario eliminado"
+            );
+            throw AuthException.usuarioNoEncontrado(loginRequest.getUserName());
+        }
+
+        if (!usuario.getEstadoUsuario()) {
+            auditLogService.registrarLoginFallido(
+                    loginRequest.getUserName(),
+                    ipAddress,
+                    userAgent,
+                    "Usuario inactivo - No autorizado para acceder"
+            );
+            throw AuthException.usuarioInactivo();
+        }
+
+        if (usuario.getBloqueadoLogin()) {
+            auditLogService.registrarLoginFallido(
+                    loginRequest.getUserName(),
+                    ipAddress,
+                    userAgent,
+                    "Usuario bloqueado por intentos fallidos"
             );
             throw AuthException.usuarioBloqueado();
         }
 
         if (!passwordEncoder.matches(loginRequest.getContrasenaUsuario(), usuario.getContrasenaUsuario())) {
-            // Incrementar intentos fallidos
             usuario.incrementarIntentosLogin();
+            usuarioService.guardarUsuario(usuario);
 
-            // Bloquear si alcanza 5 intentos
-            if (usuario.getIntentosFallidosLogin() >= 5) {
-                usuario.bloquear();
+            // Si se bloqueó, registrar el bloqueo
+            if (usuario.getBloqueadoLogin()) {
                 auditLogService.registrarBloqueoUsuario(
                         usuario,
                         ipAddress,
                         "Bloqueado automáticamente por 5 intentos fallidos"
                 );
             }
-
-            usuarioService.guardarUsuario(usuario);
 
             auditLogService.registrarLoginFallido(
                     loginRequest.getUserName(),
@@ -74,26 +98,23 @@ public class AuthServiceImpl implements AuthService {
             throw AuthException.invalidCredentials();
         }
 
-        // Login exitoso - resetear intentos fallidos
         usuario.resetearIntentosLogin();
-        usuario.setUltimoLogin(java.time.LocalDateTime.now());
+        usuario.setUltimoLogin(LocalDateTime.now());
+        usuarioService.guardarUsuario(usuario);
 
-        // Generar tokens
         String accessToken = jwtService.generateToken(usuario);
         RefreshToken refreshToken = refreshTokenService.createRefreshToken(usuario, ipAddress, userAgent);
 
-        // Registrar login exitoso en auditoría
         auditLogService.registrarLoginExitoso(usuario, ipAddress, userAgent);
 
         log.info("Login exitoso - Usuario: {} desde IP: {}", usuario.getUserName(), ipAddress);
 
-        // Construir respuesta
         UsuarioResponseDTO usuarioDTO = usuarioMapper.toResponseDTO(usuario);
 
         return AuthResponseDTO.builder()
                 .accessToken(accessToken)
                 .refreshToken(refreshToken.getToken())
-                .expiresIn(jwtConfig.getExpiration() / 1000) // Convertir a segundos
+                .expiresIn(jwtConfig.getExpiration() / 1000)
                 .tokenType("Bearer")
                 .usuario(usuarioDTO)
                 .build();

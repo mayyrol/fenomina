@@ -4,6 +4,7 @@ import com.fenomina.auth.dto.request.ActualizarUsuarioRequestDTO;
 import com.fenomina.auth.dto.request.RegistroUsuarioRequestDTO;
 import com.fenomina.auth.dto.response.UsuarioResponseDTO;
 import com.fenomina.auth.entity.Usuario;
+import com.fenomina.auth.enums.TipoAccionAudit;
 import com.fenomina.auth.exceptions.AuthException;
 import com.fenomina.auth.mappers.UsuarioMapper;
 import com.fenomina.auth.repository.UsuarioRepository;
@@ -30,6 +31,7 @@ public class UsuarioServiceImpl implements UsuarioService {
     private final PasswordEncoder passwordEncoder;
     private final AuditLogService auditLogService;
     private final UsuarioMapper usuarioMapper;
+    private final RefreshTokenService refreshTokenService;
 
     @Override
     @Transactional
@@ -166,22 +168,8 @@ public class UsuarioServiceImpl implements UsuarioService {
         usuarioRepository.save(usuario);
     }
 
-    @Override
-    @Transactional
-    public void eliminarUsuario(Long id, String ipAddress) {
-        Usuario usuario = obtenerUsuarioPorId(id);
 
-        // Soft delete
-        usuario.setDeletedAt(LocalDateTime.now());
-        usuarioRepository.save(usuario);
-
-        // Registrar en auditoría
-        Usuario usuarioEliminador = obtenerUsuarioActual();
-        auditLogService.registrarEliminacionUsuario(usuarioEliminador, usuario, ipAddress);
-
-        log.info("Usuario eliminado (soft delete): {}", usuario.getUserName());
-    }
-
+  /*
     @Override
     @Transactional
     public void desbloquearUsuario(Long id, String ipAddress) {
@@ -202,6 +190,7 @@ public class UsuarioServiceImpl implements UsuarioService {
         log.info("Usuario desbloqueado manualmente: {} por {}",
                 usuario.getUserName(), usuarioDesbloqueador.getUserName());
     }
+    */
 
     @Override
     public boolean existeUsername(String username) {
@@ -213,22 +202,103 @@ public class UsuarioServiceImpl implements UsuarioService {
         return usuarioRepository.existsByNumIdentiUsuario(numIdentificacion);
     }
 
-    @Override
-    @Transactional
-    public void intentarDesbloqueoAutomatico(Usuario usuario) {
-        if (usuario.puedeDesbloquearseAutomaticamente()) {
-            usuario.desbloquear();
-            usuarioRepository.save(usuario);
-            log.info("Usuario desbloqueado automáticamente después de 15 minutos: {}", usuario.getUserName());
-        }
-    }
-
-    /**
-     * Obtiene el usuario actualmente autenticado
-     * Usado para auditoría (saber quién hizo qué).
-     */
     private Usuario obtenerUsuarioActual() {
         String username = SecurityContextHolder.getContext().getAuthentication().getName();
         return obtenerUsuarioPorUsername(username);
     }
+    /*
+    ESPACIO
+     */
+    @Override
+    @Transactional
+    public void activarUsuario(Long id, String ipAddress) {
+        Usuario usuario = obtenerUsuarioPorId(id);
+
+        if (usuario.getEstadoUsuario()) {
+            log.warn("Usuario ya está activo: {}", usuario.getUserName());
+            return;
+        }
+
+        usuario.activar();
+        usuarioRepository.save(usuario);
+
+        Usuario usuarioAdmin = obtenerUsuarioActual();
+        auditLogService.registrarAccion(
+                TipoAccionAudit.USER_UPDATED,
+                usuarioAdmin.getUsuarioId(),
+                usuarioAdmin.getUserName(),
+                ipAddress,
+                String.format("Usuario %s activado", usuario.getUserName())
+        );
+
+        log.info("Usuario activado: {} por {}", usuario.getUserName(), usuarioAdmin.getUserName());
+    }
+
+    @Override
+    @Transactional
+    public void inactivarUsuario(Long id, String ipAddress) {
+        Usuario usuario = obtenerUsuarioPorId(id);
+
+        if (!usuario.getEstadoUsuario()) {
+            log.warn("Usuario ya está inactivo: {}", usuario.getUserName());
+            return;
+        }
+
+        usuario.inactivar();
+        usuarioRepository.save(usuario);
+
+        // Revocar todos sus tokens
+        refreshTokenService.revokeAllUserTokens(usuario.getUsuarioId());
+
+        Usuario usuarioAdmin = obtenerUsuarioActual();
+        auditLogService.registrarAccion(
+                TipoAccionAudit.USER_UPDATED,
+                usuarioAdmin.getUsuarioId(),
+                usuarioAdmin.getUserName(),
+                ipAddress,
+                String.format("Usuario %s inactivado", usuario.getUserName())
+        );
+
+        log.info("Usuario inactivado: {} por {}", usuario.getUserName(), usuarioAdmin.getUserName());
+    }
+
+    @Override
+    @Transactional
+    public void desbloquearLoginUsuario(Long id, String ipAddress) {
+        Usuario usuario = obtenerUsuarioPorId(id);
+
+        if (!usuario.getBloqueadoLogin()) {
+            log.warn("Usuario no está bloqueado: {}", usuario.getUserName());
+            return;
+        }
+
+        usuario.desbloquearLogin();
+        usuarioRepository.save(usuario);
+
+        Usuario usuarioAdmin = obtenerUsuarioActual();
+        auditLogService.registrarDesbloqueoUsuario(usuarioAdmin, usuario, ipAddress);
+
+        log.info("Login desbloqueado para usuario: {} por {}", usuario.getUserName(), usuarioAdmin.getUserName());
+    }
+
+    @Override
+    @Transactional
+    public void eliminarUsuario(Long id, String ipAddress) {
+        Usuario usuario = obtenerUsuarioPorId(id);
+
+        usuario.setDeletedAt(LocalDateTime.now());
+        usuario.inactivar();
+
+        usuarioRepository.save(usuario);
+
+        refreshTokenService.revokeAllUserTokens(usuario.getUsuarioId());
+
+        Usuario usuarioAdmin = obtenerUsuarioActual();
+        auditLogService.registrarEliminacionUsuario(usuarioAdmin, usuario, ipAddress);
+
+        log.info("Usuario eliminado: {} por {}", usuario.getUserName(), usuarioAdmin.getUserName());
+    }
 }
+
+
+
