@@ -25,8 +25,6 @@ public interface UsuarioService {
 
     UsuarioResponseDTO actualizarUsuario(Long id, ActualizarUsuarioRequestDTO dto, String ipAddress);
 
-    void eliminarUsuario(Long id, String ipAddress);
-
     boolean existeUsername(String username);
 
     boolean existeNumeroIdentificacion(String numIdentificacion);

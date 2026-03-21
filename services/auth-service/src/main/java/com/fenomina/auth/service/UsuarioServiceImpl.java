@@ -165,7 +165,13 @@ public class UsuarioServiceImpl implements UsuarioService {
 
     @Transactional
     public void guardarUsuario(Usuario usuario) {
-        usuarioRepository.save(usuario);
+        Usuario saved = usuarioRepository.save(usuario);
+        usuarioRepository.flush();
+
+        log.info("GUARDADO EN BD - ID: {}, Intentos: {}, Bloqueado: {}",
+                saved.getUsuarioId(),
+                saved.getIntentosFallidosLogin(),
+                saved.getBloqueadoLogin());
     }
 
 
@@ -281,23 +287,7 @@ public class UsuarioServiceImpl implements UsuarioService {
         log.info("Login desbloqueado para usuario: {} por {}", usuario.getUserName(), usuarioAdmin.getUserName());
     }
 
-    @Override
-    @Transactional
-    public void eliminarUsuario(Long id, String ipAddress) {
-        Usuario usuario = obtenerUsuarioPorId(id);
 
-        usuario.setDeletedAt(LocalDateTime.now());
-        usuario.inactivar();
-
-        usuarioRepository.save(usuario);
-
-        refreshTokenService.revokeAllUserTokens(usuario.getUsuarioId());
-
-        Usuario usuarioAdmin = obtenerUsuarioActual();
-        auditLogService.registrarEliminacionUsuario(usuarioAdmin, usuario, ipAddress);
-
-        log.info("Usuario eliminado: {} por {}", usuario.getUserName(), usuarioAdmin.getUserName());
-    }
 }
 
 

@@ -9,10 +9,12 @@ import com.fenomina.auth.entity.RefreshToken;
 import com.fenomina.auth.entity.Usuario;
 import com.fenomina.auth.exceptions.AuthException;
 import com.fenomina.auth.mappers.UsuarioMapper;
+import com.fenomina.auth.repository.UsuarioRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
@@ -32,16 +34,20 @@ public class AuthServiceImpl implements AuthService {
     private final PasswordEncoder passwordEncoder;
     private final UsuarioMapper usuarioMapper;
     private final JwtConfig jwtConfig;
+    private final UsuarioRepository usuarioRepository;
 
     @Override
-    @Transactional
+    @Transactional(noRollbackFor = AuthException.class)
     public AuthResponseDTO login(LoginRequestDTO loginRequest, String ipAddress, String userAgent) {
-        // Buscar usuario
         Usuario usuario = usuarioService.obtenerUsuarioPorUsername(loginRequest.getUserName());
+
+        log.info("INTENTO LOGIN - Usuario: {}, Intentos actuales: {}, Bloqueado: {}",
+                usuario.getUserName(),
+                usuario.getIntentosFallidosLogin(),
+                usuario.getBloqueadoLogin());
 
         if (usuario.puedeDesbloquearseAutomaticamente()) {
             usuario.desbloquearLogin();
-            usuarioService.guardarUsuario(usuario);
             log.info("Usuario desbloqueado automáticamente: {}", usuario.getUserName());
         }
 
@@ -50,7 +56,7 @@ public class AuthServiceImpl implements AuthService {
                     loginRequest.getUserName(),
                     ipAddress,
                     userAgent,
-                    "Usuario eliminado"
+                    "Usuario inactivo o eliminado"
             );
             throw AuthException.usuarioNoEncontrado(loginRequest.getUserName());
         }
@@ -60,12 +66,16 @@ public class AuthServiceImpl implements AuthService {
                     loginRequest.getUserName(),
                     ipAddress,
                     userAgent,
-                    "Usuario inactivo - No autorizado para acceder"
+                    "Usuario inactivo"
             );
             throw AuthException.usuarioInactivo();
         }
 
         if (usuario.getBloqueadoLogin()) {
+            log.warn("USUARIO BLOQUEADO - Intentos: {}, Bloqueado desde: {}",
+                    usuario.getIntentosFallidosLogin(),
+                    usuario.getFechaBloqueo());
+
             auditLogService.registrarLoginFallido(
                     loginRequest.getUserName(),
                     ipAddress,
@@ -76,16 +86,31 @@ public class AuthServiceImpl implements AuthService {
         }
 
         if (!passwordEncoder.matches(loginRequest.getContrasenaUsuario(), usuario.getContrasenaUsuario())) {
-            usuario.incrementarIntentosLogin();
-            usuarioService.guardarUsuario(usuario);
+            log.warn("CONTRASEÑA INCORRECTA - Intentos ANTES: {}", usuario.getIntentosFallidosLogin());
 
-            // Si se bloqueó, registrar el bloqueo
+            // Incrementar intentos
+            int intentosAntes = usuario.getIntentosFallidosLogin();
+            usuario.incrementarIntentosLogin();
+            int intentosDespues = usuario.getIntentosFallidosLogin();
+
+            log.warn("CONTRASEÑA INCORRECTA - Intentos DESPUÉS: {}, Bloqueado: {}",
+                    intentosDespues,
+                    usuario.getBloqueadoLogin());
+
+            // GUARDAR EXPLÍCITAMENTE Y FLUSH
+            usuarioRepository.saveAndFlush(usuario);  // CAMBIO CRÍTICO AQUÍ
+
+            log.error("DESPUÉS DE SAVEANDFLUSH - Intentos: {}, Bloqueado: {}",
+                    usuario.getIntentosFallidosLogin(),
+                    usuario.getBloqueadoLogin());
+
             if (usuario.getBloqueadoLogin()) {
                 auditLogService.registrarBloqueoUsuario(
                         usuario,
                         ipAddress,
                         "Bloqueado automáticamente por 5 intentos fallidos"
                 );
+                log.error("USUARIO BLOQUEADO AHORA - Total intentos: {}", usuario.getIntentosFallidosLogin());
             }
 
             auditLogService.registrarLoginFallido(
@@ -98,8 +123,10 @@ public class AuthServiceImpl implements AuthService {
             throw AuthException.invalidCredentials();
         }
 
+        // Login exitoso - resetear intentos
         usuario.resetearIntentosLogin();
         usuario.setUltimoLogin(LocalDateTime.now());
+
         usuarioService.guardarUsuario(usuario);
 
         String accessToken = jwtService.generateToken(usuario);

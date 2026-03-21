@@ -92,24 +92,6 @@ public class UsuarioController {
     }
 
     /**
-     * Eliminar un usuario (soft delete).
-     */
-    @DeleteMapping("/{id}")
-    @PreAuthorize("hasRole('SUPER_ADMIN')")
-    public ResponseEntity<MessageResponseDTO> eliminarUsuario(
-            @PathVariable Long id,
-            HttpServletRequest request) {
-
-        String ipAddress = IpUtils.getClientIp(request);
-
-        log.info("Eliminando usuario ID: {} desde IP: {}", id, ipAddress);
-
-        usuarioService.eliminarUsuario(id, ipAddress);
-
-        return ResponseEntity.ok(new MessageResponseDTO("Usuario eliminado exitosamente"));
-    }
-
-    /**
      * Activa un usuario (lo habilita para login)
      */
     @PatchMapping("/{id}/activar")
