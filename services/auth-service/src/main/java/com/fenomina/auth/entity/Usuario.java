@@ -1,5 +1,6 @@
 package com.fenomina.auth.entity;
 
+import com.fenomina.auth.config.SecurityConstants;
 import com.fenomina.auth.enums.RolUsuario;
 import jakarta.persistence.*;
 import lombok.*;
@@ -95,7 +96,7 @@ public class Usuario {
 
     public void incrementarIntentosLogin() {
         this.intentosFallidosLogin++;
-        if (this.intentosFallidosLogin >= 5) {
+        if (this.intentosFallidosLogin >= SecurityConstants.MAX_LOGIN_ATTEMPTS) {
             bloquearPorIntentosLogin();
         }
     }
@@ -115,7 +116,8 @@ public class Usuario {
         if (fechaBloqueo == null || !bloqueadoLogin) {
             return false;
         }
-        return fechaBloqueo.plusMinutes(15).isBefore(LocalDateTime.now());
+        return fechaBloqueo.plusMinutes(SecurityConstants.LOCKOUT_DURATION_MINUTES)
+                .isBefore(LocalDateTime.now());
     }
 
     public void desbloquearLogin() {

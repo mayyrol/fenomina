@@ -55,7 +55,8 @@ public class SecurityConfig {
                         .requestMatchers(
                                 "/auth/login",
                                 "/auth/refresh",
-                                "/auth/logout"
+                                "/auth/logout",
+                                "/error"
                         ).permitAll()
 
                         // Todas las demás rutas requieren autenticación
@@ -94,11 +95,13 @@ public class SecurityConfig {
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
 
-        // Orígenes permitidos (frontend)
+        // IMPORTANTE: En producción, reemplazar con dominios reales
+        // NO usar "*" en allowedOrigins con allowCredentials=true
         configuration.setAllowedOrigins(List.of(
                 "http://localhost:3000",  // React dev server
                 "http://localhost:5173",  // Vite dev server
                 "http://localhost:4200"   // Angular dev server
+                // En prod: "https://app.fenomina.com"
         ));
 
         // Métodos HTTP permitidos

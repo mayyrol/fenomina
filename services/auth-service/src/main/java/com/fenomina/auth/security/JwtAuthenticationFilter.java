@@ -1,5 +1,6 @@
 package com.fenomina.auth.security;
 
+import com.fenomina.auth.entity.Usuario;
 import com.fenomina.auth.service.JwtService;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -59,6 +60,14 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
                 // Validar token
                 if (jwtService.isTokenValid(jwt, ((CustomUserDetails) userDetails).getUsuario())) {
+
+                    Usuario usuario = ((CustomUserDetails) userDetails).getUsuario();
+                    if (!usuario.puedeHacerLogin()) {
+                        log.warn("Token válido pero usuario bloqueado/inactivo: {}", username);
+                        filterChain.doFilter(request, response);
+                        return;
+                    }
+
                     // Crear token de autenticación de Spring Security
                     UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(
                             userDetails,

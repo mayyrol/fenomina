@@ -1,6 +1,7 @@
 package com.fenomina.auth.service;
 
 import com.fenomina.auth.config.JwtConfig;
+import com.fenomina.auth.config.SecurityConstants;
 import com.fenomina.auth.entity.RefreshToken;
 import com.fenomina.auth.entity.Usuario;
 import com.fenomina.auth.repository.RefreshTokenRepository;
@@ -24,7 +25,7 @@ public class RefreshTokenServiceImpl implements RefreshTokenService {
     /**
      * Límite de sesiones activas por usuario.
      */
-    private static final int MAX_ACTIVE_SESSIONS = 5;
+    private static final int MAX_ACTIVE_SESSIONS = SecurityConstants.MAX_ACTIVE_SESSIONS;
 
     @Override
     @Transactional
@@ -135,11 +136,7 @@ public class RefreshTokenServiceImpl implements RefreshTokenService {
     }
 
     private void revokeOldestToken(Long usuarioId) {
-        // Buscar el token más antiguo activo
-        refreshTokenRepository.findAll().stream()
-                .filter(token -> token.getUsuario().getUsuarioId().equals(usuarioId))
-                .filter(token -> !token.getRevoked())
-                .min((t1, t2) -> t1.getCreatedAt().compareTo(t2.getCreatedAt()))
+        refreshTokenRepository.findOldestActiveToken(usuarioId)
                 .ifPresent(oldestToken -> {
                     oldestToken.setRevoked(true);
                     refreshTokenRepository.save(oldestToken);
