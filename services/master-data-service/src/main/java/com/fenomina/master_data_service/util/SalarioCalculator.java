@@ -8,6 +8,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.util.Optional;
 
@@ -21,10 +22,6 @@ public class SalarioCalculator {
     private static final String SMMLV_PARAM_NAME = "SMMLV";
     private static final BigDecimal MULTIPLICADOR_SALARIO_INTEGRAL = BigDecimal.valueOf(13);
 
-    /**
-     * Determina si un salario es integral según la legislación colombiana
-     * Salario integral = salario basico >= 13 SMMLV
-     */
     public boolean esSalarioIntegral(BigDecimal salarioBasico, LocalDate fecha) {
         if (salarioBasico == null) {
             throw new IllegalArgumentException("El salario básico no puede ser nulo");
@@ -41,9 +38,6 @@ public class SalarioCalculator {
         return esIntegral;
     }
 
-    /**
-     * Obtiene el valor del SMMLV vigente para una fecha especifica
-     */
     public BigDecimal obtenerSMMLVVigente(LocalDate fecha) {
         if (fecha == null) {
             fecha = LocalDate.now();
@@ -69,11 +63,6 @@ public class SalarioCalculator {
         return smmlv;
     }
 
-    /**
-     * Determina si un empleado debe tener auxilio de transporte.
-     * Según legislación colombiana: salario <= 2 SMMLV
-
-     */
     public boolean tieneDerechoAuxilioTransporte(BigDecimal salarioBasico, LocalDate fecha) {
         if (salarioBasico == null) {
             throw new IllegalArgumentException("El salario básico no puede ser nulo");
@@ -90,12 +79,8 @@ public class SalarioCalculator {
         return tieneDerecho;
     }
 
-    /**
-     * Calcula el factor salarial del empleado
-     * Factor salarial = salario basico / SMMLV
-     */
     public BigDecimal calcularFactorSalarial(BigDecimal salarioBasico, LocalDate fecha) {
         BigDecimal smmlv = obtenerSMMLVVigente(fecha);
-        return salarioBasico.divide(smmlv, 2, BigDecimal.ROUND_HALF_UP);
+        return salarioBasico.divide(smmlv, 2, RoundingMode.HALF_UP);
     }
 }
