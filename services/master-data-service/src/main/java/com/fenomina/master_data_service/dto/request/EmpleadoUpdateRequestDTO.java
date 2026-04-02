@@ -24,8 +24,7 @@ public record EmpleadoUpdateRequestDTO(
 
         @Size(max = 50, message = "El tipo de contrato no puede tener más de 50 caracteres")
         String tipoContratoEmp,
-
-        @PastOrPresent(message = "La fecha de ingreso no puede ser futura")
+//
         LocalDate fechaIngresoEmp,
 
         LocalDate fechaFinContrato,
@@ -37,7 +36,7 @@ public record EmpleadoUpdateRequestDTO(
         @Digits(integer = 13, fraction = 2, message = "El salario tiene formato inválido")
         BigDecimal salarioBascMensual,
 
-        @Size(max = 5, message = "La clase de riesgo no puede tener más de 5 caracteres")
+        @Size(max = 20, message = "La clase de riesgo no puede tener más de 5 caracteres")
         String claseRiesgo,
 
         @Size(max = 60, message = "El tipo de cotizante no puede tener más de 60 caracteres")

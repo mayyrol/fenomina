@@ -33,7 +33,6 @@ public record EmpleadoRequestDTO(
         TipoContrato tipoContratoEmp,
 
         @NotNull(message = "La fecha de ingreso es obligatoria")
-        @PastOrPresent(message = "La fecha de ingreso no puede ser futura")
         LocalDate fechaIngresoEmp,
 
         LocalDate fechaFinContrato,
@@ -46,13 +45,13 @@ public record EmpleadoRequestDTO(
         @Digits(integer = 13, fraction = 2, message = "El salario tiene formato inválido")
         BigDecimal salarioBascMensual,
 
-        @NotBlank(message = "La clase de riesgo es obligatoria")
+        @NotNull(message = "La clase de riesgo es obligatoria")
         ClaseRiesgo claseRiesgo,
 
-        @NotBlank(message = "El tipo de cotizante es obligatorio")
+        @NotNull(message = "El tipo de cotizante es obligatorio")
         TipoCotizante tipoCotizante,
 
-        @NotBlank(message = "El subtipo de cotizante es obligatorio")
+        @NotNull(message = "El subtipo de cotizante es obligatorio")
         SubtipoCotizante subtipoCotizante,
 
         @NotBlank(message = "El nombre de la ARL es obligatorio")
@@ -77,7 +76,7 @@ public record EmpleadoRequestDTO(
 
         Boolean estaExnrdParafis,
 
-        @NotBlank(message = "El tipo de jornada laboral es obligatorio")
+        @NotNull(message = "El tipo de jornada laboral es obligatorio")
         JornadaTrabajo jornadaTrabajoEmp
 ) {
 }

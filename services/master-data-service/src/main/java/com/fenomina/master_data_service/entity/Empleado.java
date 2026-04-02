@@ -74,7 +74,7 @@ public class Empleado {
     private Boolean tieneAuxTransporte = true;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "clase_riesgo", nullable = false, length = 5)
+    @Column(name = "clase_riesgo", nullable = false, length = 20)
     private ClaseRiesgo claseRiesgo;
 
     @Enumerated(EnumType.STRING)

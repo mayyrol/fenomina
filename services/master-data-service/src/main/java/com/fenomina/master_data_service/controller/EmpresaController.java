@@ -41,7 +41,7 @@ public class EmpresaController {
 
     @GetMapping
     public ResponseEntity<List<EmpresaResponseDTO>> findAll(
-            @RequestParam(required = false) String nombre) {
+            @RequestParam(name = "nombre", required = false) String nombre) {
 
         String currentRole = SecurityUtils.getCurrentUserRole();
         Long currentUserEmpresaId = SecurityUtils.getCurrentUserEmpresaId();
@@ -62,7 +62,7 @@ public class EmpresaController {
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<EmpresaResponseDTO> findById(@PathVariable Long id) {
+    public ResponseEntity<EmpresaResponseDTO> findById(@PathVariable("id") Long id) {
         String currentRole = SecurityUtils.getCurrentUserRole();
         Long currentUserEmpresaId = SecurityUtils.getCurrentUserEmpresaId();
 
@@ -80,7 +80,7 @@ public class EmpresaController {
     @PutMapping(value = "/{id}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'RRHH')")
     public ResponseEntity<EmpresaResponseDTO> update(
-            @PathVariable Long id,
+            @PathVariable("id") Long id,
             @RequestPart("empresa") @Valid EmpresaRequestDTO request,
             @RequestPart(value = "logo", required = false) MultipartFile logo) {
 
@@ -94,7 +94,7 @@ public class EmpresaController {
 
     @DeleteMapping("/{id}")
     @PreAuthorize("hasRole('SUPER_ADMIN')")
-    public ResponseEntity<Void> delete(@PathVariable Long id) {
+    public ResponseEntity<Void> delete(@PathVariable("id") Long id) {
         log.info("Solicitud de eliminación de empresa ID: {}", id);
 
         empresaService.delete(id);

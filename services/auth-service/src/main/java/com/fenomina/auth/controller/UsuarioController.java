@@ -67,7 +67,7 @@ public class UsuarioController {
      */
     @GetMapping("/{id}")
     @PreAuthorize("hasRole('SUPER_ADMIN')")
-    public ResponseEntity<UsuarioResponseDTO> obtenerUsuario(@PathVariable Long id) {
+    public ResponseEntity<UsuarioResponseDTO> obtenerUsuario(@PathVariable("id") Long id) {
         log.debug("Obteniendo usuario ID: {}", id);
         return ResponseEntity.ok(usuarioService.obtenerUsuarioDTOPorId(id));
     }

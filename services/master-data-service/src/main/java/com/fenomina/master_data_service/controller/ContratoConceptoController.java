@@ -36,7 +36,7 @@ public class ContratoConceptoController {
 
     @GetMapping("/empleados/{empleadoId}/conceptos")
     public ResponseEntity<List<ContratoConceptoResponseDTO>> findByEmpleadoId(
-            @PathVariable Long empleadoId) {
+            @PathVariable("empleadoId") Long empleadoId) {
 
         log.debug("Consultando conceptos del empleado ID: {}", empleadoId);
 
@@ -47,7 +47,7 @@ public class ContratoConceptoController {
 
 
     @GetMapping("/contratos-concepto/{id}")
-    public ResponseEntity<ContratoConceptoResponseDTO> findById(@PathVariable Long id) {
+    public ResponseEntity<ContratoConceptoResponseDTO> findById(@PathVariable("id") Long id) {
         log.debug("Consultando contrato concepto ID: {}", id);
 
         ContratoConceptoResponseDTO contratoConcepto = contratoConceptoService.findById(id);
@@ -58,7 +58,7 @@ public class ContratoConceptoController {
 
     @DeleteMapping("/contratos-concepto/{id}")
     @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'RRHH')")
-    public ResponseEntity<Void> delete(@PathVariable Long id) {
+    public ResponseEntity<Void> delete(@PathVariable("id") Long id) {
         log.info("Solicitud de eliminación de contrato concepto ID: {}", id);
 
         contratoConceptoService.delete(id);

@@ -45,9 +45,9 @@ public class EmpleadoController {
 
     @GetMapping
     public ResponseEntity<List<EmpleadoResponseDTO>> findAll(
-            @RequestParam(required = false) Long empresaId,
-            @RequestParam(required = false) EstadoEmpleado estado,
-            @RequestParam(required = false) String documento) {
+            @RequestParam(name = "empresaId", required = false) Long empresaId,
+            @RequestParam(name = "estado", required = false) EstadoEmpleado estado,
+            @RequestParam(name = "documento", required = false) String documento) {
 
         String currentRole = SecurityUtils.getCurrentUserRole();
         Long userEmpresaId = SecurityUtils.getCurrentUserEmpresaId();
@@ -71,7 +71,7 @@ public class EmpleadoController {
 
 
     @GetMapping("/{id}")
-    public ResponseEntity<EmpleadoDetalleResponseDTO> findById(@PathVariable Long id) {
+    public ResponseEntity<EmpleadoDetalleResponseDTO> findById(@PathVariable("id") Long id) {
         log.debug("Consultando empleado ID: {}", id);
 
         EmpleadoDetalleResponseDTO empleado = empleadoService.findById(id);
@@ -94,7 +94,7 @@ public class EmpleadoController {
     @PutMapping("/{id}")
     @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'RRHH')")
     public ResponseEntity<EmpleadoResponseDTO> update(
-            @PathVariable Long id,
+            @PathVariable("id") Long id,
             @Valid @RequestBody EmpleadoUpdateRequestDTO request) {
 
         log.info("Solicitud de actualización de empleado ID: {}", id);
@@ -108,7 +108,7 @@ public class EmpleadoController {
     @PatchMapping("/{id}/estado")
     @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'RRHH')")
     public ResponseEntity<EmpleadoResponseDTO> cambiarEstado(
-            @PathVariable Long id,
+            @PathVariable("id") Long id,
             @Valid @RequestBody CambiarEstadoRequestDTO request) {
 
         log.info("Solicitud de cambio de estado de empleado ID: {} a {}", id, request.nuevoEstado());
@@ -120,7 +120,7 @@ public class EmpleadoController {
 
     @DeleteMapping("/{id}")
     @PreAuthorize("hasRole('SUPER_ADMIN')")
-    public ResponseEntity<Void> delete(@PathVariable Long id) {
+    public ResponseEntity<Void> delete(@PathVariable("id") Long id) {
         log.info("Solicitud de eliminación de empleado ID: {}", id);
 
         empleadoService.delete(id);
