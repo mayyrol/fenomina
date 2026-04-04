@@ -8,6 +8,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import jakarta.servlet.http.HttpServletRequest;
 
 @RestController
 @RequestMapping("/api/master/files")
@@ -17,8 +18,11 @@ public class FileController {
 
     private final FileStorageService fileStorageService;
 
-    @GetMapping("/logos/{fileName:.+}")
-    public ResponseEntity<Resource> downloadLogo(@PathVariable String fileName) {
+    @GetMapping("/logos/**")
+    public ResponseEntity<Resource> downloadLogo(HttpServletRequest request) {
+        String fileName = request.getRequestURI()
+                .split("/api/master/files/logos/")[1];
+
         log.debug("Solicitando logo: {}", fileName);
 
         Resource resource = fileStorageService.loadFileAsResource(fileName);

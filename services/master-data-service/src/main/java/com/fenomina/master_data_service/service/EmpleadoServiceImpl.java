@@ -53,7 +53,8 @@ public class EmpleadoServiceImpl implements EmpleadoService {
                 });
 
         // 2. Validar documento único en la empresa
-        if (empleadoRepository.existsByEmpresaIdAndDocumento(request.empresaId(), request.documentoEmp())) {
+        if (empleadoRepository.existsByEmpresaIdAndTipoDocumentoAndDocumento(
+                request.empresaId(), request.tipoDocumento(), request.documentoEmp())) {
             log.warn("Documento duplicado {} en empresa ID: {}",
                     request.documentoEmp(), request.empresaId());
             throw new DuplicateDocumentException(ValidationMessages.EMPLEADO_DOCUMENTO_DUPLICATE);
@@ -70,18 +71,14 @@ public class EmpleadoServiceImpl implements EmpleadoService {
         );
         empleado.setEsSalarioIntegral(esSalarioIntegral);
 
-        // 5. Calcular si tiene derecho a auxilio de transporte
-        boolean tieneAuxTransporte = salarioCalculator.tieneDerechoAuxilioTransporte(
-                request.salarioBascMensual(),
-                request.fechaIngresoEmp()
-        );
-        empleado.setTieneAuxTransporte(tieneAuxTransporte);
+        // 5.
+        empleado.setTieneAuxTransporte(request.tieneAuxTransporte() != null ? request.tieneAuxTransporte() : true);
 
         // 6. Guardar empleado
         Empleado empleadoGuardado = empleadoRepository.save(empleado);
 
-        log.info("Empleado creado exitosamente con ID: {} - Salario integral: {} - Aux. transporte: {}",
-                empleadoGuardado.getEmpleadoId(), esSalarioIntegral, tieneAuxTransporte);
+        log.info("Empleado creado exitosamente con ID: {} - Salario integral: {} ",
+                empleadoGuardado.getEmpleadoId(), esSalarioIntegral);
 
         // 7. Crear primer registro en historial de salarios
         crearHistorialSalario(empleadoGuardado, BigDecimal.ZERO, empleadoGuardado.getSalarioBascMensual());
@@ -130,12 +127,13 @@ public class EmpleadoServiceImpl implements EmpleadoService {
 
         // Validar documento único si cambió
         if (request.documentoEmp() != null &&
-                !empleado.getDocumentoEmp().equals(request.documentoEmp()) &&
-                empleadoRepository.existsByEmpresaIdAndDocumentoAndNotId(
+                (!empleado.getDocumentoEmp().equals(request.documentoEmp()) ||
+                        (request.tipoDocumento() != null && !empleado.getTipoDocumento().equals(request.tipoDocumento()))) &&
+                empleadoRepository.existsByEmpresaIdAndTipoDocumentoAndDocumentoAndNotId(
                         empleado.getEmpresa().getEmpresaId(),
+                        request.tipoDocumento() != null ? request.tipoDocumento() : empleado.getTipoDocumento(),
                         request.documentoEmp(),
-                        id
-                )) {
+                        id)) {
             log.warn("Documento duplicado {} en empresa ID: {}",
                     request.documentoEmp(), empleado.getEmpresa().getEmpresaId());
             throw new DuplicateDocumentException(ValidationMessages.EMPLEADO_DOCUMENTO_DUPLICATE);
@@ -146,31 +144,51 @@ public class EmpleadoServiceImpl implements EmpleadoService {
 
         // Actualizar campos
         empleadoMapper.updateEntityFromDTO(request, empleado);
-
+//
         // Si cambió el salario, recalcular salario integral y auxilio transporte
         if (request.salarioBascMensual() != null &&
-                !salarioAnterior.equals(request.salarioBascMensual())) {
+                salarioAnterior.compareTo(request.salarioBascMensual()) != 0) {
 
             log.info("Salario modificado de {} a {} para empleado ID: {}",
                     salarioAnterior, request.salarioBascMensual(), id);
 
-            // Recalcular salario integral
             boolean esSalarioIntegral = salarioCalculator.esSalarioIntegral(
                     request.salarioBascMensual(),
                     LocalDate.now()
             );
             empleado.setEsSalarioIntegral(esSalarioIntegral);
 
-            // Recalcular auxilio de transporte
-            boolean tieneAuxTransporte = salarioCalculator.tieneDerechoAuxilioTransporte(
-                    request.salarioBascMensual(),
-                    LocalDate.now()
-            );
-            empleado.setTieneAuxTransporte(tieneAuxTransporte);
-
-            // Crear registro en historial de salarios
             crearHistorialSalario(empleado, salarioAnterior, request.salarioBascMensual());
         }
+
+        if (request.tieneAuxTransporte() != null) {
+            empleado.setTieneAuxTransporte(request.tieneAuxTransporte());
+        }
+
+        // Validación 1: fecha de retiro debe ser posterior a fecha de ingreso
+        if (request.fechaRetiroEmp() != null) {
+            LocalDate fechaIngreso = empleado.getFechaIngresoEmp();
+            if (fechaIngreso != null && !request.fechaRetiroEmp().isAfter(fechaIngreso)) {
+                throw new IllegalArgumentException(
+                        "La fecha de retiro debe ser posterior a la fecha de ingreso (" + fechaIngreso + ")"
+                );
+            }
+
+            // Validación 2: fecha de retiro no puede ser futura
+            if (request.fechaRetiroEmp().isAfter(LocalDate.now())) {
+                throw new IllegalArgumentException(
+                        "La fecha de retiro no puede ser una fecha futura. " +
+                                "El empleado solo puede marcarse como retirado a partir de la fecha actual o fechas anteriores"
+                );
+            }
+        }
+
+        if (request.fechaRetiroEmp() != null && empleado.getFechaRetiroEmp() != null) {
+            empleado.setEstadoEmp(EstadoEmpleado.RETIRADO);
+            log.info("Empleado ID: {} marcado como RETIRADO por fecha de retiro: {}",
+                    id, empleado.getFechaRetiroEmp());
+        }
+
 
         Empleado empleadoActualizado = empleadoRepository.save(empleado);
 
@@ -199,11 +217,11 @@ public class EmpleadoServiceImpl implements EmpleadoService {
         // Actualizar estado
         empleado.setEstadoEmp(nuevoEstado);
 
-        // Si pasa a RETIRADO, marcar fecha de retiro
-        if (nuevoEstado == EstadoEmpleado.RETIRADO) {
-            empleado.setFechaRetiroEmp(LocalDate.now());
-            log.info("Fecha de retiro establecida para empleado ID: {}", id);
+        if (estadoActual == EstadoEmpleado.RETIRADO && nuevoEstado == EstadoEmpleado.ACTIVO) {
+            empleado.setFechaRetiroEmp(null);
+            log.info("Fecha de retiro limpiada para empleado ID: {} al reactivarse", id);
         }
+
 
         Empleado empleadoActualizado = empleadoRepository.save(empleado);
 
@@ -237,34 +255,18 @@ public class EmpleadoServiceImpl implements EmpleadoService {
      */
     private void validarTransicionEstado(EstadoEmpleado estadoActual, EstadoEmpleado nuevoEstado) {
         if (estadoActual == nuevoEstado) {
-            log.warn("Intento de cambiar al mismo estado: {}", estadoActual);
             throw new InvalidStateTransitionException(
                     "El empleado ya se encuentra en estado " + estadoActual
             );
         }
 
-        // Validar transiciones permitidas
-        boolean transicionValida = false;
-
-        switch (estadoActual) {
-            case ACTIVO:
-                // Desde ACTIVO puede ir a INACTIVO o RETIRADO
-                transicionValida = (nuevoEstado == EstadoEmpleado.INACTIVO ||
-                        nuevoEstado == EstadoEmpleado.RETIRADO);
-                break;
-            case INACTIVO:
-                // Desde INACTIVO puede ir a ACTIVO o RETIRADO
-                transicionValida = (nuevoEstado == EstadoEmpleado.ACTIVO ||
-                        nuevoEstado == EstadoEmpleado.RETIRADO);
-                break;
-            case RETIRADO:
-                // Desde RETIRADO no puede cambiar a ningún estado
-                transicionValida = false;
-                break;
-        }
+        boolean transicionValida = switch (estadoActual) {
+            case ACTIVO   -> nuevoEstado == EstadoEmpleado.INACTIVO;
+            case INACTIVO -> nuevoEstado == EstadoEmpleado.ACTIVO;
+            case RETIRADO -> nuevoEstado == EstadoEmpleado.ACTIVO;
+        };
 
         if (!transicionValida) {
-            log.warn("Transición de estado no permitida: {} → {}", estadoActual, nuevoEstado);
             throw new InvalidStateTransitionException(
                     ValidationMessages.EMPLEADO_INVALID_STATE_TRANSITION +
                             ": " + estadoActual + " → " + nuevoEstado

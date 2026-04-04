@@ -1,10 +1,12 @@
 package com.fenomina.master_data_service.exceptions;
 
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.validation.FieldError;
+import org.springframework.web.ErrorResponse;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -217,5 +219,27 @@ public class GlobalExceptionHandler {
         response.put("path", request.getDescription(false).replace("uri=", ""));
 
         return response;
+    }
+
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    public ResponseEntity<Map<String, Object>> handleDataIntegrityViolation(
+            DataIntegrityViolationException ex,
+            WebRequest request) {
+
+        String message = "Error de integridad de datos";
+
+        if (ex.getMessage() != null && ex.getMessage().contains("uq_documento_empresa")) {
+            message = "Ya existe un empleado con ese tipo y número de documento en esta empresa";
+        }
+
+        log.warn("Violación de integridad: {}", ex.getMessage());
+
+        Map<String, Object> response = buildErrorResponse(
+                HttpStatus.CONFLICT,
+                message,
+                request
+        );
+
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(response);
     }
 }

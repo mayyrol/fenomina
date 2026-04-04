@@ -29,12 +29,16 @@ public record EmpleadoUpdateRequestDTO(
 
         LocalDate fechaFinContrato,
 
+        LocalDate fechaRetiroEmp,
+
         @Size(max = 60, message = "El cargo no puede tener más de 60 caracteres")
         String cargoEmp,
 
         @DecimalMin(value = "0.01", message = "El salario debe ser mayor a cero")
         @Digits(integer = 13, fraction = 2, message = "El salario tiene formato inválido")
         BigDecimal salarioBascMensual,
+
+        Boolean tieneAuxTransporte,
 
         @Size(max = 20, message = "La clase de riesgo no puede tener más de 5 caracteres")
         String claseRiesgo,
