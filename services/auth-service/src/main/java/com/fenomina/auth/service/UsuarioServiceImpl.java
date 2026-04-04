@@ -132,7 +132,10 @@ public class UsuarioServiceImpl implements UsuarioService {
             usuario.setRolUsuario(dto.getRolUsuario());
         }
 
-        if (dto.getFkIdEmpresa() != null && !dto.getFkIdEmpresa().equals(usuario.getFkIdEmpresa())) {
+        if (dto.getFkIdEmpresa() == null && usuario.getFkIdEmpresa() != null) {
+            cambios.append("empresaId: ").append(usuario.getFkIdEmpresa()).append(" → null; ");
+            usuario.setFkIdEmpresa(null);
+        } else if (dto.getFkIdEmpresa() != null && !dto.getFkIdEmpresa().equals(usuario.getFkIdEmpresa())) {
             cambios.append("empresaId: ").append(usuario.getFkIdEmpresa())
                     .append(" → ").append(dto.getFkIdEmpresa()).append("; ");
             usuario.setFkIdEmpresa(dto.getFkIdEmpresa());
