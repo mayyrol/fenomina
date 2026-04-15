@@ -25,4 +25,6 @@ public interface ContratoConceptoRepository extends JpaRepository<ContratoConcep
 
     @Query("SELECT CASE WHEN COUNT(cc) > 0 THEN true ELSE false END FROM ContratoConcepto cc WHERE cc.empleado.empleadoId = :empleadoId AND cc.conceptoNomina.concepNominaId = :conceptoId AND cc.contratoConceptId <> :id AND cc.deletedAt IS NULL")
     boolean existsByEmpleadoAndConceptoAndNotId(@Param("empleadoId") Long empleadoId, @Param("conceptoId") Long conceptoId, @Param("id") Long id);
+
+
 }

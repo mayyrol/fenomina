@@ -1,7 +1,9 @@
 package com.fenomina.master_data_service.controller;
 
 import com.fenomina.master_data_service.dto.request.ContratoConceptoRequestDTO;
+import com.fenomina.master_data_service.dto.response.ConceptoNominaResponseDTO;
 import com.fenomina.master_data_service.dto.response.ContratoConceptoResponseDTO;
+import com.fenomina.master_data_service.repository.ConceptoNominaRepository;
 import com.fenomina.master_data_service.service.ContratoConceptoService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -20,6 +22,7 @@ import java.util.List;
 public class ContratoConceptoController {
 
     private final ContratoConceptoService contratoConceptoService;
+    private final ConceptoNominaRepository conceptoNominaRepository;
 
     @PostMapping("/contratos-concepto")
     @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'RRHH')")
@@ -64,5 +67,34 @@ public class ContratoConceptoController {
         contratoConceptoService.delete(id);
 
         return ResponseEntity.noContent().build();
+    }
+
+    @GetMapping("/conceptos-nomina/contrato")
+    public ResponseEntity<List<ConceptoNominaResponseDTO>> findConceptosContrato() {
+        log.debug("Consultando conceptos de nómina disponibles para contrato");
+
+        List<ConceptoNominaResponseDTO> response = conceptoNominaRepository
+                .findConceptosDisponiblesParaContrato()
+                .stream()
+                .map(c -> new ConceptoNominaResponseDTO(
+                        c.getConcepNominaId(),
+                        c.getNombreConcepNomina(),
+                        c.getDescrConcepNomina(),
+                        c.getCategoriaConcNomina() != null
+                                ? c.getCategoriaConcNomina().name()
+                                : null
+                ))
+                .toList();
+
+        return ResponseEntity.ok(response);
+    }
+
+    @PatchMapping("/contratos-concepto/{id}")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'RRHH')")
+    public ResponseEntity<ContratoConceptoResponseDTO> update(
+            @PathVariable("id") Long id,
+            @RequestBody ContratoConceptoRequestDTO request) {
+        ContratoConceptoResponseDTO response = contratoConceptoService.update(id, request);
+        return ResponseEntity.ok(response);
     }
 }

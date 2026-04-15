@@ -14,6 +14,7 @@ public enum ParametroNombre {
     SANCION_MINIMA_DIAN("Sanción Mínima DIAN (10 UVT)", TipoParametro.VALOR),
     TOPE_COTIZACION("Tope de Cotización (IBC Máximo)", TipoParametro.VALOR),
     SALARIO_INTEGRAL_MINIMO("Salario Integral Mínimo", TipoParametro.VALOR),
+    TOPE_COTIZACION_IBC ("Base de Cotización máximo permitido", TipoParametro.VALOR),
 
     // 2. Jornada y Recargos
     JORNADA_MAXIMA_SEMANAL("Jornada Máxima Semanal", TipoParametro.VALOR),
@@ -32,8 +33,19 @@ public enum ParametroNombre {
     SALUD_EMPLEADOR("Salud Empleador", TipoParametro.PORCENTAJE),
     PENSION_EMPLEADO("Pensión Empleado", TipoParametro.PORCENTAJE),
     PENSION_EMPLEADOR("Pensión Empleador", TipoParametro.PORCENTAJE),
-    FONDO_SOLIDARIDAD_PENSIONAL("Fondo de Solidaridad Pensional", TipoParametro.PORCENTAJE),
-    ARL_EMPLEADOR("ARL (Riesgos Laborales) Empleador", TipoParametro.PORCENTAJE),
+
+    FONDO_SOLIDARIDAD_PENSIONAL_1("Fondo de Solidaridad Pensional >=4 a <16 (SMMLV)", TipoParametro.PORCENTAJE),
+    FONDO_SOLIDARIDAD_PENSIONAL_2("Fondo de Solidaridad Pensional >=16 a 17 (SMMLV)", TipoParametro.PORCENTAJE),
+    FONDO_SOLIDARIDAD_PENSIONAL_3("Fondo de Solidaridad Pensional De 17 a 18 (SMMLV)", TipoParametro.PORCENTAJE),
+    FONDO_SOLIDARIDAD_PENSIONAL_4("Fondo de Solidaridad Pensional De 18 a 19 (SMMLV)", TipoParametro.PORCENTAJE),
+    FONDO_SOLIDARIDAD_PENSIONAL_5("Fondo de Solidaridad Pensional De 19 a 20 (SMMLV)", TipoParametro.PORCENTAJE),
+    FONDO_SOLIDARIDAD_PENSIONAL_6("Fondo de Solidaridad Pensional Superiores a 20 (SMMLV)", TipoParametro.PORCENTAJE),
+
+    ARL_EMPLEADOR_I("ARL (Riesgos Laborales) Empleador I", TipoParametro.PORCENTAJE),
+    ARL_EMPLEADOR_II("ARL (Riesgos Laborales) Empleador II", TipoParametro.PORCENTAJE),
+    ARL_EMPLEADOR_III("ARL (Riesgos Laborales) Empleador III", TipoParametro.PORCENTAJE),
+    ARL_EMPLEADOR_IV("ARL (Riesgos Laborales) Empleador IV", TipoParametro.PORCENTAJE),
+    ARL_EMPLEADOR_V("ARL (Riesgos Laborales) Empleador V", TipoParametro.PORCENTAJE),
 
     // 4. Parafiscales
     CAJA_COMPENSACION("Caja de Compensación", TipoParametro.PORCENTAJE),

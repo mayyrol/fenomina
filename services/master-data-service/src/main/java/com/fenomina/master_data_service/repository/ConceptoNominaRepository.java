@@ -33,4 +33,13 @@ public interface ConceptoNominaRepository extends JpaRepository<ConceptoNomina, 
     List<ConceptoNomina> findByEsSalarioTrue();
 
     List<ConceptoNomina> findByEsIbcTrue();
+
+    @Query("SELECT c FROM ConceptoNomina c WHERE c.nombreConcepNomina IN (" +
+            "'Beneficios o extralegales no salariales', " +
+            "'Bonificaciones habituales', " +
+            "'Viáticos permanentes manutención y alojamiento', " +
+            "'Otros pagos que constituyen salario', " +
+            "'Otros pagos que no constituyen salario permanente') " +
+            "ORDER BY c.nombreConcepNomina")
+    List<ConceptoNomina> findConceptosDisponiblesParaContrato();
 }

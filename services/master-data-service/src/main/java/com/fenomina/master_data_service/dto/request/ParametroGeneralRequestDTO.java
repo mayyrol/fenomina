@@ -14,14 +14,13 @@ public record ParametroGeneralRequestDTO(
         String descripcionParam,
 
         @NotNull(message = "La fecha de vigencia del parámetro es obligatoria")
-        @FutureOrPresent(message = "La fecha de vigencia no puede ser pasada")
         LocalDate fechaParamGeneral,
 
         @Digits(integer = 12, fraction = 3, message = "El valor del parámetro tiene formato inválido")
         BigDecimal valorParamGeneral,
 
         @DecimalMin(value = "0.0001", message = "El porcentaje debe ser mayor a cero")
-        @DecimalMax(value = "1.0", message = "El porcentaje no puede ser mayor a 1 (100%)")
+        @DecimalMax(value = "2.0", message = "El porcentaje no puede ser mayor a 2 (200%)")
         @Digits(integer = 1, fraction = 4, message = "El porcentaje tiene formato inválido")
         BigDecimal porcentajeParamGeneral
 ) {

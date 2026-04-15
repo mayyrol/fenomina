@@ -17,6 +17,7 @@ import com.fenomina.master_data_service.util.ValidationMessages;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
@@ -32,7 +33,7 @@ public class ContratoConceptoServiceImpl implements ContratoConceptoService {
     private final ContratoConceptoMapper contratoConceptoMapper;
 
     @Override
-    @Transactional
+    @Transactional(isolation = Isolation.READ_COMMITTED)
     public ContratoConceptoResponseDTO create(ContratoConceptoRequestDTO request) {
         log.info("Asignando concepto ID: {} a empleado ID: {}",
                 request.conceptoNominaId(), request.empleadoId());
@@ -127,8 +128,41 @@ public class ContratoConceptoServiceImpl implements ContratoConceptoService {
 
         // Soft delete
         contratoConcepto.softDelete();
-        contratoConceptoRepository.save(contratoConcepto);
+        contratoConceptoRepository.saveAndFlush(contratoConcepto);
 
         log.info("Contrato concepto eliminado (soft delete) exitosamente: {}", id);
+    }
+
+    // En ContratoConceptoServiceImpl:
+    @Override
+    @Transactional
+    public ContratoConceptoResponseDTO update(Long id, ContratoConceptoRequestDTO request) {
+        ContratoConcepto contratoConcepto = contratoConceptoRepository.findByIdActive(id)
+                .orElseThrow(() -> new ContratoConceptoNotFoundException(
+                        ValidationMessages.CONTRATO_CONCEPTO_NOT_FOUND));
+
+        // Si cambió el concepto, validar que no exista ya ese concepto para el empleado
+        if (!contratoConcepto.getConceptoNomina().getConcepNominaId()
+                .equals(request.conceptoNominaId())) {
+            if (contratoConceptoRepository.existsByEmpleadoAndConceptoAndNotId(
+                    contratoConcepto.getEmpleado().getEmpleadoId(),
+                    request.conceptoNominaId(),
+                    id)) {
+                throw new DuplicateContratoConceptoException(
+                        ValidationMessages.CONTRATO_CONCEPTO_DUPLICATE);
+            }
+            ConceptoNomina nuevoConcepto = conceptoNominaRepository
+                    .findById(request.conceptoNominaId())
+                    .orElseThrow(() -> new ConceptoNominaNotFoundException(
+                            ValidationMessages.CONCEPTO_NOT_FOUND));
+            contratoConcepto.setConceptoNomina(nuevoConcepto);
+        }
+
+        if (request.valorFijo() != null) {
+            contratoConcepto.setValorFijo(request.valorFijo());
+        }
+
+        return contratoConceptoMapper.toResponseDTO(
+                contratoConceptoRepository.save(contratoConcepto));
     }
 }

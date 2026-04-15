@@ -14,4 +14,6 @@ public interface ContratoConceptoService {
     ContratoConceptoResponseDTO findById(Long id);
 
     void delete(Long id);
+
+    ContratoConceptoResponseDTO update(Long id, ContratoConceptoRequestDTO request);
 }
