@@ -94,6 +94,7 @@ public class ContratoConceptoController {
     public ResponseEntity<ContratoConceptoResponseDTO> update(
             @PathVariable("id") Long id,
             @RequestBody ContratoConceptoRequestDTO request) {
+        log.info("Solicitud de actualización de contrato concepto ID: {}", id);
         ContratoConceptoResponseDTO response = contratoConceptoService.update(id, request);
         return ResponseEntity.ok(response);
     }

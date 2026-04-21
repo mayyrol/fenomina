@@ -133,13 +133,17 @@ public class ContratoConceptoServiceImpl implements ContratoConceptoService {
         log.info("Contrato concepto eliminado (soft delete) exitosamente: {}", id);
     }
 
-    // En ContratoConceptoServiceImpl:
     @Override
     @Transactional
     public ContratoConceptoResponseDTO update(Long id, ContratoConceptoRequestDTO request) {
+        log.info("Actualizando contrato concepto ID: {}", id);
+
         ContratoConcepto contratoConcepto = contratoConceptoRepository.findByIdActive(id)
-                .orElseThrow(() -> new ContratoConceptoNotFoundException(
-                        ValidationMessages.CONTRATO_CONCEPTO_NOT_FOUND));
+                .orElseThrow(() -> {
+                    log.warn("Contrato concepto no encontrado con ID: {}", id);
+                    return new ContratoConceptoNotFoundException(
+                            ValidationMessages.CONTRATO_CONCEPTO_NOT_FOUND);
+                });
 
         // Si cambió el concepto, validar que no exista ya ese concepto para el empleado
         if (!contratoConcepto.getConceptoNomina().getConcepNominaId()
@@ -162,7 +166,9 @@ public class ContratoConceptoServiceImpl implements ContratoConceptoService {
             contratoConcepto.setValorFijo(request.valorFijo());
         }
 
-        return contratoConceptoMapper.toResponseDTO(
-                contratoConceptoRepository.save(contratoConcepto));
+        ContratoConcepto actualizado = contratoConceptoRepository.save(contratoConcepto);
+        log.info("Contrato concepto actualizado exitosamente: {}", actualizado.getContratoConceptId());
+
+        return contratoConceptoMapper.toResponseDTO(actualizado);
     }
 }

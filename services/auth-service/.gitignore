@@ -31,3 +31,21 @@ build/
 
 ### VS Code ###
 .vscode/
+
+# Configuraciones locales del servicio
+application-local.properties
+application-local.yml
+
+# Variables de entorno
+.env
+.env.local
+
+# Archivos temporales
+*.tmp
+*.swp
+
+# Certificados y keys
+*.jks
+*.p12
+*.key
+*.pem

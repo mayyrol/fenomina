@@ -26,15 +26,24 @@ public interface EmpleadoMapper {
     @Mapping(target = "createdBy", ignore = true)
     @Mapping(target = "updatedBy", ignore = true)
     @Mapping(target = "deletedAt", ignore = true)
+    //Aqui
+    @Mapping(target = "fechaRetiroEmp", ignore = true)
+    //Aqui
     Empleado toEntity(EmpleadoRequestDTO dto);
 
     @Mapping(source = "empresa.empresaId", target = "empresaId")
     @Mapping(source = "empresa.nombreEmpresa", target = "empresaNombre")
+    //Aqui
+    @Mapping(source = "fechaRetiroEmp", target = "fechaRetiroEmp")
+    //Aqui
     EmpleadoResponseDTO toResponseDTO(Empleado empleado);
 
     List<EmpleadoResponseDTO> toResponseDTOList(List<Empleado> empleados);
 
     @Mapping(source = "empresa", target = "empresa")
+    //Aqui
+    @Mapping(source = "fechaRetiroEmp", target = "fechaRetiroEmp")
+    //Aqui
     EmpleadoDetalleResponseDTO toDetalleResponseDTO(Empleado empleado);
 
     @Mapping(target = "empleadoId", ignore = true)
