@@ -23,4 +23,9 @@ public interface ParametroGeneralRepository extends JpaRepository<ParametroGener
     Optional<ParametroGeneral> findVigenteByNombreAndFecha(@Param("nombre") ParametroNombre nombre, @Param("fecha") LocalDate fecha);
 
     List<ParametroGeneral> findByNombreParamGeneral(ParametroNombre nombreParamGeneral);
+
+    boolean existsByNombreParamGeneralAndFechaParamGeneral(
+            ParametroNombre nombreParamGeneral,
+            LocalDate fechaParamGeneral
+    );
 }

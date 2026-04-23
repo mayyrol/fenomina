@@ -27,13 +27,29 @@ public class ParametroGeneralServiceImpl implements ParametroGeneralService {
     public ParametroGeneralResponseDTO create(ParametroGeneralRequestDTO request) {
         log.info("Creando parámetro general: {}", request.nombreParamGeneral());
 
-        // Mapear DTO a entidad
-        ParametroGeneral parametro = parametroGeneralMapper.toEntity(request);
+        boolean yaExiste = parametroGeneralRepository
+                .existsByNombreParamGeneralAndFechaParamGeneral(
+                        request.nombreParamGeneral(),
+                        request.fechaParamGeneral()
+                );
 
-        // Guardar
+        if (yaExiste) {
+            throw new IllegalArgumentException(
+                    String.format(
+                            "Ya existe un parámetro '%s' con fecha de vigencia %s. " +
+                                    "No se pueden registrar dos parámetros con el mismo nombre " +
+                                    "y la misma fecha de vigencia",
+                            request.nombreParamGeneral(),
+                            request.fechaParamGeneral()
+                    )
+            );
+        }
+
+        ParametroGeneral parametro = parametroGeneralMapper.toEntity(request);
         ParametroGeneral parametroGuardado = parametroGeneralRepository.save(parametro);
 
-        log.info("Parámetro general creado exitosamente con ID: {}", parametroGuardado.getParamGeneralId());
+        log.info("Parámetro general creado exitosamente con ID: {}",
+                parametroGuardado.getParamGeneralId());
 
         return parametroGeneralMapper.toResponseDTO(parametroGuardado);
     }
