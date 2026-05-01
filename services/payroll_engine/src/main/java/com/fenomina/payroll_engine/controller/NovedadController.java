@@ -1,5 +1,7 @@
 package com.fenomina.payroll_engine.controller;
 
+import com.fenomina.payroll_engine.client.MasterDataClientWrapper;
+import com.fenomina.payroll_engine.client.dto.ConceptoNominaDTO;
 import com.fenomina.payroll_engine.dto.request.NovedadRequestDTO;
 import com.fenomina.payroll_engine.dto.response.NovedadResponseDTO;
 import com.fenomina.payroll_engine.mapper.NovedadMapper;
@@ -24,6 +26,7 @@ public class NovedadController {
 
     private final NovedadService novedadService;
     private final NovedadMapper mapper;
+    private final MasterDataClientWrapper masterDataClient;
 
     @PostMapping
     @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'RRHH')")
@@ -37,7 +40,8 @@ public class NovedadController {
         Novedad novedad = mapper.toEntity(request, usuarioId);
         Novedad creada = novedadService.crear(novedad);
 
-        return ResponseEntity.status(HttpStatus.CREATED).body(mapper.toResponse(creada));
+        List<ConceptoNominaDTO> conceptos = masterDataClient.findAllConceptosNomina();
+        return ResponseEntity.status(HttpStatus.CREATED).body(mapper.toResponse(creada, conceptos));
     }
 
     @PutMapping("/{id}")
@@ -52,7 +56,8 @@ public class NovedadController {
         Novedad novedadActualizada = mapper.toEntity(request, usuarioId);
         Novedad actualizada = novedadService.actualizar(id, novedadActualizada);
 
-        return ResponseEntity.ok(mapper.toResponse(actualizada));
+        List<ConceptoNominaDTO> conceptos = masterDataClient.findAllConceptosNomina();
+        return ResponseEntity.ok(mapper.toResponse(actualizada, conceptos));
     }
 
     @DeleteMapping("/{id}")
@@ -69,9 +74,10 @@ public class NovedadController {
             @PathVariable("procesoId") Long procesoId
     ) {
         log.debug("Consultando novedades del proceso: {}", procesoId);
+        List<ConceptoNominaDTO> conceptos = masterDataClient.findAllConceptosNomina();
         List<NovedadResponseDTO> novedades = novedadService.findByProceso(procesoId)
                 .stream()
-                .map(mapper::toResponse)
+                .map(n -> mapper.toResponse(n, conceptos))
                 .toList();
         return ResponseEntity.ok(novedades);
     }
@@ -83,10 +89,11 @@ public class NovedadController {
             @PathVariable("empleadoId") Long empleadoId
     ) {
         log.debug("Consultando novedades empleado: {} proceso: {}", empleadoId, procesoId);
+        List<ConceptoNominaDTO> conceptos = masterDataClient.findAllConceptosNomina();
         List<NovedadResponseDTO> novedades = novedadService
                 .findByEmpleadoYProceso(empleadoId, procesoId)
                 .stream()
-                .map(mapper::toResponse)
+                .map(n -> mapper.toResponse(n, conceptos))
                 .toList();
         return ResponseEntity.ok(novedades);
     }

@@ -29,12 +29,11 @@ public class ProvisionesCalculator {
         }
 
         BigDecimal basePrima = calcularBasePrima(ctx, devengos);
-        BigDecimal baseVacaciones = calcularBaseVacaciones(ctx, devengos);
+
 
         provisiones.add(calcularPrima(ctx, basePrima));
         provisiones.add(calcularCesantias(ctx, basePrima));
         provisiones.add(calcularInteresesCesantias(ctx, basePrima));
-        provisiones.add(calcularVacaciones(ctx, baseVacaciones));
 
         return provisiones;
     }
@@ -53,27 +52,11 @@ public class ProvisionesCalculator {
         return devengos.stream()
                 .filter(d -> !d.isEsInformativo())
                 .filter(d -> d.isEsSalario() || d.isEsAuxilioTransporte())
-                .filter(d -> !esVacacionesCompensadas(d.getNombreConcepto()))
                 .map(DevengoCalculado::getValorResultado)
                 .reduce(BigDecimal.ZERO, BigDecimal::add)
                 .setScale(ESCALA, RoundingMode.HALF_UP);
     }
 
-    private BigDecimal calcularBaseVacaciones(
-            ContextoLiquidacion ctx,
-            List<DevengoCalculado> devengos
-    ) {
-        // Base vacaciones:
-        // salario básico + recargos nocturnos
-        // Excluye: horas extra, recargos dominicales/festivos,
-        // auxilio de transporte, bonificaciones
-        return devengos.stream()
-                .filter(d -> !d.isEsInformativo())
-                .filter(d -> esSalarioBaseVacaciones(d.getNombreConcepto()))
-                .map(DevengoCalculado::getValorResultado)
-                .reduce(BigDecimal.ZERO, BigDecimal::add)
-                .setScale(ESCALA, RoundingMode.HALF_UP);
-    }
 
     // --- Provisiones ---
 
@@ -142,26 +125,6 @@ public class ProvisionesCalculator {
                 .baseCalculo(cesantiasPeriodo)
                 .porcentaje(porcentajeIntereses)
                 .valorResultado(valorIntereses)
-                .esInformativo(false)
-                .build();
-    }
-
-    private ProvisionCalculada calcularVacaciones(
-            ContextoLiquidacion ctx,
-            BigDecimal baseVacaciones
-    ) {
-        BigDecimal porcentajeVacaciones = ctx.getParametrosPorNombre()
-                .get("VACACIONES").porcentajeParamGeneral();
-
-        BigDecimal valorVacaciones = baseVacaciones
-                .multiply(porcentajeVacaciones)
-                .setScale(ESCALA, RoundingMode.HALF_UP);
-
-        return ProvisionCalculada.builder()
-                .nombreConcepto("Vacaciones")
-                .baseCalculo(baseVacaciones)
-                .porcentaje(porcentajeVacaciones)
-                .valorResultado(valorVacaciones)
                 .esInformativo(false)
                 .build();
     }

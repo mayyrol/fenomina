@@ -18,15 +18,19 @@ public interface MasterDataClient {
     @GetMapping("/api/master/empleados")
     List<EmpleadoDTO> findEmpleadosActivos(
             @RequestParam("empresaId") Long empresaId,
-            @RequestParam("estado") String estado
+            @RequestParam("estado") String estado,
+            @RequestHeader("X-Internal-Api-Key") String internalApiKey
     );
 
     @GetMapping("/api/master/parametros")
-    List<ParametroGeneralDTO> findAllParametros();
+    List<ParametroGeneralDTO> findAllParametros(
+            @RequestHeader("X-Internal-Api-Key") String internalApiKey
+    );
 
     @GetMapping("/api/master/empleados/{empleadoId}/conceptos")
     List<ContratoConceptoDTO> findConceptosFijosByEmpleado(
-            @PathVariable("empleadoId") Long empleadoId
+            @PathVariable("empleadoId") Long empleadoId,
+            @RequestHeader("X-Internal-Api-Key") String internalApiKey
     );
 
     @GetMapping("/api/master/internal/conceptos-nomina")
@@ -35,5 +39,8 @@ public interface MasterDataClient {
     );
 
     @GetMapping("/api/master/empresas/{empresaId}")
-    EmpresaDTO findEmpresaById(@PathVariable("empresaId") Long empresaId);
+    EmpresaDTO findEmpresaById(
+            @PathVariable("empresaId") Long empresaId,
+            @RequestHeader("X-Internal-Api-Key") String internalApiKey
+    );
 }

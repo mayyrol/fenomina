@@ -8,8 +8,11 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
-
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.context.SecurityContextHolder;
 import java.io.IOException;
+import java.util.List;
 
 @Component
 @RequiredArgsConstructor
@@ -28,16 +31,23 @@ public class InternalApiKeyFilter extends OncePerRequestFilter {
             FilterChain filterChain
     ) throws ServletException, IOException {
 
-        String path = request.getRequestURI();
+        String path    = request.getRequestURI();
+        String apiKey  = request.getHeader(INTERNAL_API_KEY_HEADER);
 
-        if (!path.startsWith(INTERNAL_PATH_PREFIX)) {
+        if (apiKey != null && apiKey.equals(internalApiKey)) {
+            // Autenticar como servicio interno para que pase el anyRequest().authenticated()
+            UsernamePasswordAuthenticationToken auth = new UsernamePasswordAuthenticationToken(
+                    "internal-service",
+                    null,
+                    List.of(new SimpleGrantedAuthority("ROLE_INTERNAL"))
+            );
+            SecurityContextHolder.getContext().setAuthentication(auth);
             filterChain.doFilter(request, response);
             return;
         }
 
-        String apiKey = request.getHeader(INTERNAL_API_KEY_HEADER);
-
-        if (apiKey == null || !apiKey.equals(internalApiKey)) {
+        // Si es ruta interna sin key válida, rechazar
+        if (path.startsWith(INTERNAL_PATH_PREFIX)) {
             response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
             response.setContentType("application/json");
             response.getWriter().write("{\"error\": \"Acceso interno no autorizado\"}");

@@ -7,6 +7,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Optional;
 
@@ -56,4 +57,10 @@ public interface NominaCabeceraRepository extends JpaRepository<NominaCabecera, 
             @Param("periodoFin") Integer periodoFin,
             @Param("estadoPagado") EstadoProceso estadoPagado
     );
+
+    @Query("SELECT COUNT(nc) FROM NominaCabecera nc WHERE nc.fkProcesoLiquiId = :procesoId")
+    Integer countByFkProcesoLiquiId(@Param("procesoId") Long procesoId);
+
+    @Query("SELECT COALESCE(SUM(nc.netoNominaEmp), 0) FROM NominaCabecera nc WHERE nc.fkProcesoLiquiId = :procesoId")
+    BigDecimal sumNetoByFkProcesoLiquiId(@Param("procesoId") Long procesoId);
 }

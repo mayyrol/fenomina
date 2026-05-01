@@ -59,6 +59,16 @@ public class ProcesoLiquidacionServiceImpl implements ProcesoLiquidacionService 
             LocalDate fechaInicio,
             LocalDate fechaFin
     ) {
+        // Detectar automáticamente si es quincenal o mensual según días del periodo
+        if (tipoProceso == TipoProceso.NOMINA_MENSUAL ||
+                tipoProceso == TipoProceso.NOMINA_QUINCENAL) {
+            long diasPeriodo = java.time.temporal.ChronoUnit.DAYS
+                    .between(fechaInicio, fechaFin) + 1;
+            tipoProceso = diasPeriodo <= 16
+                    ? TipoProceso.NOMINA_QUINCENAL
+                    : TipoProceso.NOMINA_MENSUAL;
+        }
+
         log.info("Creando proceso de liquidación - empresa: {}, tipo: {}, año: {}, periodo: {}",
                 empresaId, tipoProceso, anio, periodo);
 

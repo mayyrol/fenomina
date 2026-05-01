@@ -1,12 +1,20 @@
 package com.fenomina.payroll_engine.mapper;
 
+import com.fenomina.payroll_engine.client.MasterDataClientWrapper;
+import com.fenomina.payroll_engine.client.dto.ConceptoNominaDTO;
 import com.fenomina.payroll_engine.dto.request.NovedadRequestDTO;
 import com.fenomina.payroll_engine.dto.response.NovedadResponseDTO;
 import com.fenomina.payroll_engine.entity.Novedad;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
+import java.util.List;
+
 @Component
+@RequiredArgsConstructor
 public class NovedadMapper {
+
+    private final MasterDataClientWrapper masterDataClient;
 
     public Novedad toEntity(NovedadRequestDTO request, Long usuarioId) {
         Novedad novedad = new Novedad();
@@ -26,11 +34,18 @@ public class NovedadMapper {
         return novedad;
     }
 
-    public NovedadResponseDTO toResponse(Novedad novedad) {
+    public NovedadResponseDTO toResponse(Novedad novedad, List<ConceptoNominaDTO> conceptos) {
+        String nombreConcepto = conceptos.stream()
+                .filter(c -> c.concepNominaId().equals(novedad.getFkConcepNominaId()))
+                .map(ConceptoNominaDTO::nombreConcepNomina)
+                .findFirst()
+                .orElse(null);
+
         return new NovedadResponseDTO(
                 novedad.getNovedadId(),
                 novedad.getFkEmpleadoId(),
                 novedad.getFkConcepNominaId(),
+                nombreConcepto,
                 novedad.getProcesoLiquid(),
                 novedad.getAnio(),
                 novedad.getPeriodo(),

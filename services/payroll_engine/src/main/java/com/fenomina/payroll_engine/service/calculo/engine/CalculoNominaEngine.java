@@ -241,9 +241,29 @@ public class CalculoNominaEngine {
         cabecera = nominaCabeceraRepository.save(cabecera);
 
         // --- h. Persistir detalles ---
+        // --- h. Persistir detalles ---
         List<ReporteNominaDetalle> detalles = new ArrayList<>();
 
         detalles.addAll(mapearDevengos(devengos, cabecera.getCabecNominaId()));
+
+// LOGS AQUÍ - antes de mapear
+        deducciones.forEach(d ->
+                log.debug("Deduccion a mapear: '{}' -> existe: {}",
+                        d.getNombreConcepto(),
+                        conceptosPorNombre.containsKey(d.getNombreConcepto()))
+        );
+        aportesPatronales.forEach(a ->
+                log.debug("Aporte patronal a mapear: '{}' -> existe: {}",
+                        a.getNombreConcepto(),
+                        conceptosPorNombre.containsKey(a.getNombreConcepto()))
+        );
+        provisiones.forEach(p ->
+                log.debug("Provision a mapear: '{}' -> existe: {}",
+                        p.getNombreConcepto(),
+                        conceptosPorNombre.containsKey(p.getNombreConcepto()))
+        );
+
+// MAPEOS DESPUÉS
         detalles.addAll(mapearDeducciones(deducciones, cabecera.getCabecNominaId(),
                 conceptosPorNombre));
         detalles.addAll(mapearAportesPatronales(aportesPatronales,

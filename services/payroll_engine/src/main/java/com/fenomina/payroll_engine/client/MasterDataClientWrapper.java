@@ -19,15 +19,15 @@ public class MasterDataClientWrapper {
     private final MasterDataClient masterDataClient;
 
     public List<EmpleadoDTO> findEmpleadosActivos(Long empresaId) {
-        return masterDataClient.findEmpleadosActivos(empresaId, ESTADO_ACTIVO);
+        return masterDataClient.findEmpleadosActivos(empresaId, ESTADO_ACTIVO, internalApiKey);
     }
 
     public List<ParametroGeneralDTO> findAllParametros() {
-        return masterDataClient.findAllParametros();
+        return masterDataClient.findAllParametros(internalApiKey);
     }
 
     public List<ContratoConceptoDTO> findConceptosFijosByEmpleado(Long empleadoId) {
-        return masterDataClient.findConceptosFijosByEmpleado(empleadoId);
+        return masterDataClient.findConceptosFijosByEmpleado(empleadoId, internalApiKey);
     }
 
     public List<ConceptoNominaDTO> findAllConceptosNomina() {
@@ -35,6 +35,6 @@ public class MasterDataClientWrapper {
     }
 
     public EmpresaDTO findEmpresaById(Long empresaId) {
-        return masterDataClient.findEmpresaById(empresaId);
+        return masterDataClient.findEmpresaById(empresaId, internalApiKey);
     }
 }

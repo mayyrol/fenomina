@@ -1,5 +1,6 @@
 package com.fenomina.payroll_engine.dto.response;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 
@@ -13,5 +14,7 @@ public record ProcesoLiquidacionResponseDTO(
         LocalDate fechaInicioPeriodo,
         LocalDate fechaFinPeriodo,
         LocalDateTime createdAt,
-        LocalDateTime updatedAt
+        LocalDateTime updatedAt,
+        Integer cantidadEmpleados,
+        BigDecimal totalNeto
 ) {}

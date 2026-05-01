@@ -204,11 +204,11 @@ public class SeguridadSocialCalculator {
         String claseRiesgo = ctx.getEmpleado().claseRiesgo();
 
         String claveArl = switch (claseRiesgo.toUpperCase()) {
-            case "I", "1" -> "ARL_EMPLEADOR_I";
-            case "II", "2" -> "ARL_EMPLEADOR_II";
-            case "III", "3" -> "ARL_EMPLEADOR_III";
-            case "IV", "4" -> "ARL_EMPLEADOR_IV";
-            case "V", "5" -> "ARL_EMPLEADOR_V";
+            case "I", "1", "CLASE_I" -> "ARL_EMPLEADOR_I";
+            case "II", "2", "CLASE_II" -> "ARL_EMPLEADOR_II";
+            case "III", "3", "CLASE_III" -> "ARL_EMPLEADOR_III";
+            case "IV", "4", "CLASE_IV" -> "ARL_EMPLEADOR_IV";
+            case "V", "5", "CLASE_V" -> "ARL_EMPLEADOR_V";
             default -> throw new com.fenomina.payroll_engine.exception.ParametroNoEncontradoException(
                     String.format("Clase de riesgo ARL no reconocida: %s", claseRiesgo)
             );

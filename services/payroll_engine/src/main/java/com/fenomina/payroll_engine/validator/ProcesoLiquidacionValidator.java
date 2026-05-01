@@ -37,12 +37,67 @@ public class ProcesoLiquidacionValidator {
             );
         }
 
+        if (tipoProceso == TipoProceso.NOMINA_MENSUAL ||
+                tipoProceso == TipoProceso.NOMINA_QUINCENAL) {
+
+            if (fechaInicio.getMonthValue() != fechaFin.getMonthValue() ||
+                    fechaInicio.getYear() != fechaFin.getYear()) {
+                throw new ValidacionNominaException(
+                        "fechas",
+                        "Las fechas de inicio y fin del periodo de nómina deben " +
+                                "corresponder al mismo mes y año"
+                );
+            }
+
+            int mesFechaInicio = fechaInicio.getMonthValue();
+            int mesFechaFin    = fechaFin.getMonthValue();
+
+            if (mesFechaInicio != periodo || mesFechaFin != periodo) {
+                throw new ValidacionNominaException(
+                        "periodo",
+                        String.format(
+                                "Las fechas ingresadas corresponden al mes %d pero el " +
+                                        "periodo declarado es el mes %d. " +
+                                        "Las fechas deben corresponder al mes seleccionado",
+                                mesFechaInicio, periodo
+                        )
+                );
+            }
+
+            long diasPeriodo = java.time.temporal.ChronoUnit.DAYS
+                    .between(fechaInicio, fechaFin) + 1;
+
+            if (diasPeriodo < 12) {
+                throw new ValidacionNominaException(
+                        "fechas",
+                        String.format(
+                                "El periodo ingresado tiene %d día(s), lo cual es insuficiente. " +
+                                        "El mínimo permitido es 12 días",
+                                diasPeriodo
+                        )
+                );
+            }
+
+            if (diasPeriodo > 31) {
+                throw new ValidacionNominaException(
+                        "fechas",
+                        String.format(
+                                "El periodo ingresado tiene %d día(s), lo cual excede el máximo " +
+                                        "permitido de 31 días",
+                                diasPeriodo
+                        )
+                );
+            }
+
+        }
+
         validarPeriodoSegunTipo(tipoProceso, anio, periodo, fechaInicio, fechaFin);
     }
 
     public void validarEmpleadosSeleccionados(
             List<Long> empleadosSeleccionados,
-            List<EmpleadoDTO> empleadosActivos
+            List<EmpleadoDTO> empleadosActivos,
+            LocalDate fechaFinPeriodo
     ) {
         if (empleadosSeleccionados == null || empleadosSeleccionados.isEmpty()) {
             throw new ValidacionNominaException(
@@ -55,7 +110,7 @@ public class ProcesoLiquidacionValidator {
                 .collect(Collectors.toMap(EmpleadoDTO::empleadoId, e -> e));
 
         List<Long> noActivos = empleadosSeleccionados.stream()
-                .filter(id -> !activosPorId.containsKey(id))
+                .filter(empId -> !activosPorId.containsKey(empId))
                 .toList();
 
         if (!noActivos.isEmpty()) {
@@ -67,6 +122,25 @@ public class ProcesoLiquidacionValidator {
                             noActivos
                     )
             );
+        }
+
+        for (Long empId : empleadosSeleccionados) {
+            EmpleadoDTO empleado = activosPorId.get(empId);
+            if (empleado.fechaIngresoEmp() != null &&
+                    empleado.fechaIngresoEmp().isAfter(fechaFinPeriodo)) {
+                throw new ValidacionNominaException(
+                        "empleadosSeleccionados",
+                        String.format(
+                                "El empleado %s %s tiene fecha de ingreso %s, que es " +
+                                        "posterior al periodo a liquidar (%s). " +
+                                        "No puede incluirse en este proceso",
+                                empleado.nombresEmp(),
+                                empleado.apellidosEmp(),
+                                empleado.fechaIngresoEmp(),
+                                fechaFinPeriodo
+                        )
+                );
+            }
         }
     }
 

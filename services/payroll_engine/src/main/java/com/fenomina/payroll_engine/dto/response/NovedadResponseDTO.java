@@ -8,6 +8,7 @@ public record NovedadResponseDTO(
         Long novedadId,
         Long fkEmpleadoId,
         Long fkConcepNominaId,
+        String nombreConcepto,
         Long procesoLiquid,
         Integer anio,
         Integer periodo,
