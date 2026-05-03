@@ -8,6 +8,7 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 
@@ -63,4 +64,24 @@ public interface NominaCabeceraRepository extends JpaRepository<NominaCabecera, 
 
     @Query("SELECT COALESCE(SUM(nc.netoNominaEmp), 0) FROM NominaCabecera nc WHERE nc.fkProcesoLiquiId = :procesoId")
     BigDecimal sumNetoByFkProcesoLiquiId(@Param("procesoId") Long procesoId);
+
+    @Query("""
+        SELECT nc FROM NominaCabecera nc
+        WHERE nc.fkEmpleadoId = :empleadoId
+        AND nc.fkProcesoLiquiId IN (
+            SELECT p.procesoLiquiId FROM ProcesoLiquidacion p
+            WHERE p.fkIdEmpresa = :empresaId
+            AND p.estadoProcNomina = 'PAGADO'
+            AND p.fechaFinPeriodo >= :fechaInicio
+            AND p.fechaFinPeriodo <= :fechaFin
+            AND p.tipoProceso IN ('NOMINA_MENSUAL', 'NOMINA_QUINCENAL')
+        )
+        ORDER BY nc.periodoCotiNomina ASC
+        """)
+    List<NominaCabecera> findNominasDelSemestre(
+            @Param("empleadoId") Long empleadoId,
+            @Param("empresaId") Long empresaId,
+            @Param("fechaInicio") LocalDate fechaInicio,
+            @Param("fechaFin") LocalDate fechaFin
+    );
 }

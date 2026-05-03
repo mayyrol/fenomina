@@ -54,7 +54,8 @@ public class ProcesoLiquidacionController {
     @GetMapping
     @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'RRHH', 'CLIENTE_EMPRESA', 'AUDITOR')")
     public ResponseEntity<List<ProcesoLiquidacionResponseDTO>> findByEmpresa(
-            @RequestParam("empresaId") Long empresaId
+            @RequestParam("empresaId") Long empresaId,
+            @RequestParam(value = "tipoProceso", required = false) String tipoProceso
     ) {
         String rol = SecurityUtils.getCurrentUserRole();
         Long empresaIdUsuario = SecurityUtils.getCurrentUserEmpresaId();
@@ -65,15 +66,22 @@ public class ProcesoLiquidacionController {
             }
         }
 
-        log.debug("Consultando procesos - empresa: {}", empresaId);
+        log.debug("Consultando procesos - empresa: {}, tipoProceso: {}", empresaId, tipoProceso);
 
-        List<ProcesoLiquidacionResponseDTO> procesos = procesoService
-                .findByEmpresa(empresaId)
-                .stream()
+        List<ProcesoLiquidacion> procesos = procesoService.findByEmpresa(empresaId);
+
+        if (tipoProceso != null && !tipoProceso.isBlank()) {
+            procesos = procesos.stream()
+                    .filter(p -> p.getTipoProceso() != null &&
+                            p.getTipoProceso().name().equals(tipoProceso))
+                    .toList();
+        }
+
+        List<ProcesoLiquidacionResponseDTO> response = procesos.stream()
                 .map(mapper::toResponse)
                 .toList();
 
-        return ResponseEntity.ok(procesos);
+        return ResponseEntity.ok(response);
     }
 
     @GetMapping("/{id}")

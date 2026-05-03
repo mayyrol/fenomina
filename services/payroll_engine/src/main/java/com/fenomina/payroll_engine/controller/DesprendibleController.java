@@ -19,6 +19,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -209,5 +210,79 @@ public class DesprendibleController {
                             .build();
                 })
                 .toList();
+    }
+
+    @GetMapping("/prima/preview/{empresaId}/empleado/{empleadoId}")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'RRHH')")
+    public ResponseEntity<Map<String, Object>> getPreviewPrimaEmpleado(
+            @PathVariable("empresaId") Long empresaId,
+            @PathVariable("empleadoId") Long empleadoId,
+            @RequestParam("semestre") Integer semestre,
+            @RequestParam("anio") Integer anio
+    ) {
+        log.debug("Preview prima - empresa: {}, empleado: {}, semestre: {}, anio: {}",
+                empresaId, empleadoId, semestre, anio);
+
+        LocalDate fechaInicio = semestre == 1
+                ? LocalDate.of(anio, 1, 1)
+                : LocalDate.of(anio, 7, 1);
+        LocalDate fechaFin = semestre == 1
+                ? LocalDate.of(anio, 6, 30)
+                : LocalDate.of(anio, 12, 31);
+
+        // Cabeceras de nóminas pagadas del empleado en el semestre
+        List<NominaCabecera> cabeceras = nominaCabeceraRepository
+                .findNominasDelSemestre(empleadoId, empresaId, fechaInicio, fechaFin);
+
+        // Sumar días laborados (concepto ID=1)
+        int diasLaborados = cabeceras.stream()
+                .mapToInt(cabecera -> {
+                    List<ReporteNominaDetalle> detalles = reporteNominaDetalleRepository
+                            .findByFkCabecNominaId(cabecera.getCabecNominaId());
+                    return detalles.stream()
+                            .filter(d -> d.getFkConcepNominaId() == 1L)
+                            .mapToInt(d -> d.getCantidadConcept() != null
+                                    ? d.getCantidadConcept() : 0)
+                            .sum();
+                })
+                .sum();
+
+        // Conceptos variables del semestre (excluir salario base, deducciones y aportes patronales)
+        List<Long> CONCEPTOS_EXCLUIDOS = List.of(1L, 16L, 22L, 23L, 32L, 33L, 34L, 35L, 36L,
+                37L, 38L, 39L, 40L, 41L, 42L, 43L, 44L, 45L, 46L, 47L);
+
+        List<ConceptoNominaDTO> todosConceptos = masterDataClient.findAllConceptosNomina();
+        Map<Long, ConceptoNominaDTO> conceptosPorId = todosConceptos.stream()
+                .collect(Collectors.toMap(ConceptoNominaDTO::concepNominaId, c -> c));
+
+        List<Map<String, Object>> novedades = cabeceras.stream()
+                .flatMap(cabecera -> {
+                    List<ReporteNominaDetalle> detalles = reporteNominaDetalleRepository
+                            .findByFkCabecNominaId(cabecera.getCabecNominaId());
+                    return detalles.stream()
+                            .filter(d -> !CONCEPTOS_EXCLUIDOS.contains(d.getFkConcepNominaId()))
+                            .map(d -> {
+                                ConceptoNominaDTO concepto = conceptosPorId
+                                        .get(d.getFkConcepNominaId());
+                                return Map.<String, Object>of(
+                                        "nombreConcepto", concepto != null
+                                                ? concepto.nombreConcepNomina() : "N/A",
+                                        "valorResultado", d.getValorResultConcept() != null
+                                                ? d.getValorResultConcept() : BigDecimal.ZERO,
+                                        "cantidad", d.getCantidadConcept() != null
+                                                ? d.getCantidadConcept() : 0,
+                                        "periodo", cabecera.getPeriodoCotiNomina(),
+                                        "anio", cabecera.getAnioCabecNomina()
+                                );
+                            });
+                })
+                .toList();
+
+        return ResponseEntity.ok(Map.of(
+                "diasLaborados", diasLaborados,
+                "novedades", novedades,
+                "fechaInicio", fechaInicio.toString(),
+                "fechaFin", fechaFin.toString()
+        ));
     }
 }

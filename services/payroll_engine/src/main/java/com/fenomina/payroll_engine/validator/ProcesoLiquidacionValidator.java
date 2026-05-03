@@ -289,10 +289,10 @@ public class ProcesoLiquidacionValidator {
                         "Para prima del segundo semestre la fecha inicio debe ser 01/07"
                 );
             }
-            if (fechaFin.getMonthValue() != 12 || fechaFin.getDayOfMonth() != 20) {
+            if (fechaFin.getMonthValue() != 12 || fechaFin.getDayOfMonth() != 31) {
                 throw new ValidacionNominaException(
                         "fechaFin",
-                        "Para prima del segundo semestre la fecha fin debe ser 20/12"
+                        "Para prima del segundo semestre la fecha fin debe ser 31/12"
                 );
             }
         }

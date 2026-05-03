@@ -133,10 +133,6 @@ public class LiquidacionPrimaServiceImpl implements LiquidacionPrimaService {
                 ? fechaIngreso
                 : fechaInicioPeriodo;
 
-        int diasLiquidados = LiquidacionFechaUtils.calcularDias(fechaInicioReal, fechaFinPeriodo);
-        diasLiquidados = Math.min(diasLiquidados, DIAS_SEMESTRE);
-
-        // --- Nóminas pagadas del semestre ---
         int periodoInicio = fechaInicioPeriodo.getMonthValue();
         int periodoFin = fechaFinPeriodo.getMonthValue();
 
@@ -148,6 +144,26 @@ public class LiquidacionPrimaServiceImpl implements LiquidacionPrimaService {
                         periodoFin,
                         EstadoProceso.PAGADO
                 );
+
+        int diasLiquidados;
+        if (!nominasSemestre.isEmpty()) {
+            // Sumar días laborados reales desde reporte_nomina_detalle (concepto ID=1)
+            diasLiquidados = nominasSemestre.stream()
+                    .mapToInt(nc -> reporteNominaDetalleRepository
+                            .findByFkCabecNominaId(nc.getCabecNominaId())
+                            .stream()
+                            .filter(d -> d.getFkConcepNominaId() != null &&
+                                    d.getFkConcepNominaId() == 1L)
+                            .mapToInt(d -> d.getCantidadConcept() != null
+                                    ? d.getCantidadConcept() : 0)
+                            .sum())
+                    .sum();
+            diasLiquidados = Math.min(diasLiquidados, DIAS_SEMESTRE);
+        } else {
+            // Sin nóminas pagadas, calcular por fechas
+            diasLiquidados = LiquidacionFechaUtils.calcularDias(fechaInicioReal, fechaFinPeriodo);
+            diasLiquidados = Math.min(diasLiquidados, DIAS_SEMESTRE);
+        }
 
         // --- Base de liquidación ---
         // Para salario fijo: salario del último mes del semestre
