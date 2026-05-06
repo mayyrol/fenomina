@@ -22,18 +22,18 @@ public interface DetalleLiquiPrestacionRepository extends JpaRepository<DetalleL
 
     // Historial de prestaciones de un empleado, usado para calcular promedios en prima y cesantías
     @Query("""
-            SELECT d FROM DetalleLiquiPrestacion d
-            WHERE d.fkEmpleadoId = :empleadoId
-            AND d.fkCabeLiquiPrestacionId IN (
-                SELECT c.cabeLiquiPrestacionId FROM CabeceraLiquiPrestacion c
-                WHERE c.fkProcesoLiquiId IN (
-                    SELECT p.procesoLiquiId FROM ProcesoLiquidacion p
-                    WHERE p.estadoProcNomina = 'PAGADO'
-                    AND p.anio = :anio
-                )
+        SELECT d FROM DetalleLiquiPrestacion d
+        WHERE d.fkEmpleadoId = :empleadoId
+        AND d.fkCabeLiquiPrestacionId IN (
+            SELECT c.cabeLiquiPrestacionId FROM CabeceraLiquiPrestacion c
+            WHERE c.fkProcesoLiquiId IN (
+                SELECT p.procesoLiquiId FROM ProcesoLiquidacion p
+                WHERE p.estadoProcNomina IN ('PAGADO', 'PENDIENTE_PAGO')
+                AND p.anio = :anio
             )
-            ORDER BY d.fechaInicioCorteEmp ASC
-            """)
+        )
+        ORDER BY d.fechaInicioCorteEmp ASC
+        """)
     List<DetalleLiquiPrestacion> findHistoricoByEmpleadoAndAnio(
             @Param("empleadoId") Long empleadoId,
             @Param("anio") Integer anio

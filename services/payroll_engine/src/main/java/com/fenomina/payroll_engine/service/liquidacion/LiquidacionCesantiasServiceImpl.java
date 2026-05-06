@@ -125,9 +125,6 @@ public class LiquidacionCesantiasServiceImpl implements LiquidacionCesantiasServ
                 ? fechaIngreso
                 : fechaInicioPeriodo;
 
-        int diasLiquidados = LiquidacionFechaUtils.calcularDias(fechaInicioReal, fechaFinPeriodo);
-        diasLiquidados = Math.min(diasLiquidados, DIAS_ANIO);
-
         // --- Nóminas pagadas del año ---
         List<NominaCabecera> nominasAnio = nominaCabeceraRepository
                 .findByEmpleadoAndRangoPeriodo(
@@ -137,6 +134,24 @@ public class LiquidacionCesantiasServiceImpl implements LiquidacionCesantiasServ
                         12,
                         EstadoProceso.PAGADO
                 );
+
+        int diasLiquidados;
+        if (!nominasAnio.isEmpty()) {
+            diasLiquidados = nominasAnio.stream()
+                    .mapToInt(nc -> reporteNominaDetalleRepository
+                            .findByFkCabecNominaId(nc.getCabecNominaId())
+                            .stream()
+                            .filter(d -> d.getFkConcepNominaId() != null &&
+                                    d.getFkConcepNominaId().equals(1L))
+                            .mapToInt(d -> d.getCantidadConcept() != null
+                                    ? d.getCantidadConcept() : 0)
+                            .sum())
+                    .sum();
+            diasLiquidados = Math.min(diasLiquidados, DIAS_ANIO);
+        } else {
+            diasLiquidados = LiquidacionFechaUtils.calcularDias(fechaInicioReal, fechaFinPeriodo);
+            diasLiquidados = Math.min(diasLiquidados, DIAS_ANIO);
+        }
 
         // --- Base de liquidación ---
         // Si salario no varió en últimos 3 meses: último salario mensual devengado
@@ -196,39 +211,13 @@ public class LiquidacionCesantiasServiceImpl implements LiquidacionCesantiasServ
             return empleado.salarioBascMensual();
         }
 
-        List<NominaCabecera> ultimas3 = nominasAnio.stream()
-                .sorted((a, b) -> b.getPeriodoCotiNomina()
-                        .compareTo(a.getPeriodoCotiNomina()))
-                .limit(3)
+        List<Long> conceptosSalarialesIds = conceptosPorNombre.values().stream()
+                .filter(c -> Boolean.TRUE.equals(c.esSalario())
+                        || "Auxilio de transporte".equals(c.nombreConcepNomina()))
+                .filter(c -> !"Vacaciones compensadas en dinero"
+                        .equals(c.nombreConcepNomina()))
+                .map(ConceptoNominaDTO::concepNominaId)
                 .collect(Collectors.toList());
-
-        ConceptoNominaDTO conceptoSalario = conceptosPorNombre.get("Salario días trabajados");
-        if (conceptoSalario == null) {
-            return empleado.salarioBascMensual();
-        }
-
-        List<BigDecimal> salariosUltimas3 = ultimas3.stream()
-                .map(nc -> reporteNominaDetalleRepository
-                        .findByFkCabecNominaId(nc.getCabecNominaId())
-                        .stream()
-                        .filter(d -> conceptoSalario.concepNominaId()
-                                .equals(d.getFkConcepNominaId()))
-                        .map(d -> d.getBaseCalculoConcept() != null
-                                ? d.getBaseCalculoConcept()
-                                : BigDecimal.ZERO)
-                        .findFirst()
-                        .orElse(BigDecimal.ZERO))
-                .collect(Collectors.toList());
-
-        boolean salarioVario = salariosUltimas3.stream()
-                .filter(s -> s.compareTo(BigDecimal.ZERO) > 0)
-                .distinct()
-                .count() > 1;
-
-        if (!salarioVario && !salariosUltimas3.isEmpty()
-                && salariosUltimas3.get(0).compareTo(BigDecimal.ZERO) > 0) {
-            return salariosUltimas3.get(0);
-        }
 
         List<BigDecimal> devengadosPorPeriodo = nominasAnio.stream()
                 .map(nc -> {
@@ -237,24 +226,19 @@ public class LiquidacionCesantiasServiceImpl implements LiquidacionCesantiasServ
                                     .findByFkCabecNominaId(nc.getCabecNominaId());
 
                     return detalles.stream()
-                            .filter(d -> {
-                                ConceptoNominaDTO concepto = conceptosPorNombre.values()
-                                        .stream()
-                                        .filter(c -> c.concepNominaId()
-                                                .equals(d.getFkConcepNominaId()))
-                                        .findFirst()
-                                        .orElse(null);
-                                return concepto != null
-                                        && Boolean.TRUE.equals(concepto.esSalario())
-                                        && !"Vacaciones compensadas en dinero"
-                                        .equals(concepto.nombreConcepNomina());
-                            })
+                            .filter(d -> conceptosSalarialesIds
+                                    .contains(d.getFkConcepNominaId()))
                             .map(d -> d.getValorResultConcept() != null
                                     ? d.getValorResultConcept()
                                     : BigDecimal.ZERO)
                             .reduce(BigDecimal.ZERO, BigDecimal::add);
                 })
+                .filter(v -> v.compareTo(BigDecimal.ZERO) > 0)
                 .collect(Collectors.toList());
+
+        if (devengadosPorPeriodo.isEmpty()) {
+            return empleado.salarioBascMensual();
+        }
 
         BigDecimal sumaDevengados = devengadosPorPeriodo.stream()
                 .reduce(BigDecimal.ZERO, BigDecimal::add);

@@ -11,9 +11,7 @@ import com.fenomina.payroll_engine.exception.ProcesoYaCerradoException;
 import com.fenomina.payroll_engine.exception.ValidacionNominaException;
 import com.fenomina.payroll_engine.client.dto.ContratoConceptoDTO;
 import com.fenomina.payroll_engine.client.dto.EmpleadoDTO;
-import com.fenomina.payroll_engine.repository.NovedadRepository;
-import com.fenomina.payroll_engine.repository.NominaCabeceraRepository;
-import com.fenomina.payroll_engine.repository.ProcesoLiquidacionRepository;
+import com.fenomina.payroll_engine.repository.*;
 import com.fenomina.payroll_engine.validator.NovedadValidator;
 import com.fenomina.payroll_engine.validator.ProcesoLiquidacionValidator;
 import lombok.RequiredArgsConstructor;
@@ -34,7 +32,8 @@ public class ProcesoLiquidacionServiceImpl implements ProcesoLiquidacionService 
     private static final List<EstadoProceso> ESTADOS_ACTIVOS = List.of(
             EstadoProceso.BORRADOR,
             EstadoProceso.CERRADO,
-            EstadoProceso.PENDIENTE_PAGO
+            EstadoProceso.PENDIENTE_PAGO,
+            EstadoProceso.PAGADO
     );
 
     private static final String ESTADO_ACTIVO_EMPLEADO = "ACTIVO";
@@ -47,6 +46,9 @@ public class ProcesoLiquidacionServiceImpl implements ProcesoLiquidacionService 
     private final MasterDataClientWrapper masterDataClient;
     private final ProcesoLiquidacionValidator procesoValidator;
     private final NovedadValidator novedadValidator;
+
+    private final CabeceraLiquiPrestacionRepository cabeceraLiquiPrestacionRepository;
+    private final DetalleLiquiPrestacionRepository detalleLiquiPrestacionRepository;
 
     @Override
     @Transactional
@@ -111,6 +113,29 @@ public class ProcesoLiquidacionServiceImpl implements ProcesoLiquidacionService 
 
         estadoValidator.validarTransicion(proceso.getEstadoProcNomina(), nuevoEstado);
 
+        if (nuevoEstado == EstadoProceso.ANULADO &&
+                proceso.getTipoProceso() == TipoProceso.CESANTIAS_ANUAL) {
+            procesoRepository
+                    .findByEmpresaAndTipoAndAnio(
+                            proceso.getFkIdEmpresa(),
+                            TipoProceso.INTERESES_CESANTIAS_ANUAL,
+                            proceso.getAnio()
+                    )
+                    .stream()
+                    .findFirst()
+                    .ifPresent(procesoIntereses -> {
+                        estadoValidator.validarTransicion(
+                                procesoIntereses.getEstadoProcNomina(),
+                                EstadoProceso.ANULADO
+                        );
+                        procesoIntereses.setEstadoProcNomina(EstadoProceso.ANULADO);
+                        procesoIntereses.setUpdatedBy(usuarioId);
+                        procesoRepository.save(procesoIntereses);
+                        log.info("Proceso de intereses {} anulado junto con cesantías",
+                                procesoIntereses.getProcesoLiquiId());
+                    });
+        }
+
         if (nuevoEstado == EstadoProceso.CERRADO) {
             validarCierre(proceso);
         }
@@ -158,9 +183,46 @@ public class ProcesoLiquidacionServiceImpl implements ProcesoLiquidacionService 
         novedadRepository.findByProcesoLiquid(procesoId)
                 .forEach(novedadRepository::delete);
 
+        cabeceraLiquiPrestacionRepository
+                .findByFkProcesoLiquiId(procesoId)
+                .ifPresent(cabecera -> {
+                    detalleLiquiPrestacionRepository
+                            .findByFkCabeLiquiPrestacionId(cabecera.getCabeLiquiPrestacionId())
+                            .forEach(detalleLiquiPrestacionRepository::delete);
+                    cabeceraLiquiPrestacionRepository.delete(cabecera);
+                });
+        // Si es cesantías, eliminar también el proceso de intereses del mismo año
+        if (proceso.getTipoProceso() == TipoProceso.CESANTIAS_ANUAL) {
+            procesoRepository
+                    .findByEmpresaAndTipoAndAnio(
+                            proceso.getFkIdEmpresa(),
+                            TipoProceso.INTERESES_CESANTIAS_ANUAL,
+                            proceso.getAnio()
+                    )
+                    .stream()
+                    .findFirst()
+                    .ifPresent(procesoIntereses -> {
+                        novedadRepository.findByProcesoLiquid(procesoIntereses.getProcesoLiquiId())
+                                .forEach(novedadRepository::delete);
+
+                        cabeceraLiquiPrestacionRepository
+                                .findByFkProcesoLiquiId(procesoIntereses.getProcesoLiquiId())
+                                .ifPresent(cab -> {
+                                    detalleLiquiPrestacionRepository
+                                            .findByFkCabeLiquiPrestacionId(cab.getCabeLiquiPrestacionId())
+                                            .forEach(detalleLiquiPrestacionRepository::delete);
+                                    cabeceraLiquiPrestacionRepository.delete(cab);
+                                });
+
+                        procesoRepository.delete(procesoIntereses);
+                        log.info("Proceso de intereses {} eliminado junto con cesantías",
+                                procesoIntereses.getProcesoLiquiId());
+                    });
+        }
+
         procesoRepository.delete(proceso);
 
-        log.info("Proceso {} eliminado junto con sus novedades", procesoId);
+        log.info("Proceso {} eliminado junto con todos sus registros asociados", procesoId);
     }
 
     // --- Validaciones internas ---

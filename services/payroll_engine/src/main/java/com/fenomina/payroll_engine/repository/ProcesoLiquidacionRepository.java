@@ -9,6 +9,7 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
+import java.util.Optional;
 
 @Repository
 public interface ProcesoLiquidacionRepository extends JpaRepository<ProcesoLiquidacion, Long> {
@@ -34,5 +35,21 @@ public interface ProcesoLiquidacionRepository extends JpaRepository<ProcesoLiqui
     List<ProcesoLiquidacion> findByFkIdEmpresaAndEstadoProcNomina(
             Long fkIdEmpresa,
             EstadoProceso estado
+    );
+
+    @Query("""
+        SELECT p FROM ProcesoLiquidacion p
+        WHERE p.fkIdEmpresa = :empresaId
+        AND p.tipoProceso = :tipoProceso
+        AND p.anio = :anio
+        AND p.estadoProcNomina NOT IN (
+            com.fenomina.payroll_engine.enums.EstadoProceso.ANULADO
+        )
+        ORDER BY p.createdAt DESC
+        """)
+    List<ProcesoLiquidacion> findByEmpresaAndTipoAndAnio(
+            @Param("empresaId") Long empresaId,
+            @Param("tipoProceso") TipoProceso tipoProceso,
+            @Param("anio") Integer anio
     );
 }

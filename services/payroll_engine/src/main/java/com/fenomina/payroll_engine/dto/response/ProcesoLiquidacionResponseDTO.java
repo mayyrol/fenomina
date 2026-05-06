@@ -16,5 +16,6 @@ public record ProcesoLiquidacionResponseDTO(
         LocalDateTime createdAt,
         LocalDateTime updatedAt,
         Integer cantidadEmpleados,
-        BigDecimal totalNeto
+        BigDecimal totalNeto,
+        BigDecimal totalIntereses
 ) {}

@@ -2,13 +2,17 @@ package com.fenomina.payroll_engine.service.liquidacion;
 
 import com.fenomina.payroll_engine.entity.CabeceraLiquiPrestacion;
 import com.fenomina.payroll_engine.entity.DetalleLiquiPrestacion;
+import com.fenomina.payroll_engine.entity.NominaCabecera;
 import com.fenomina.payroll_engine.entity.ProcesoLiquidacion;
+import com.fenomina.payroll_engine.enums.EstadoProceso;
 import com.fenomina.payroll_engine.exception.CalculoNominaException;
 import com.fenomina.payroll_engine.client.MasterDataClientWrapper;
 import com.fenomina.payroll_engine.client.dto.ConceptoNominaDTO;
 import com.fenomina.payroll_engine.client.dto.EmpleadoDTO;
 import com.fenomina.payroll_engine.repository.CabeceraLiquiPrestacionRepository;
 import com.fenomina.payroll_engine.repository.DetalleLiquiPrestacionRepository;
+import com.fenomina.payroll_engine.repository.NominaCabeceraRepository;
+import com.fenomina.payroll_engine.repository.ReporteNominaDetalleRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -33,6 +37,8 @@ public class LiquidacionInteresesServiceImpl implements LiquidacionInteresesServ
     private final MasterDataClientWrapper masterDataClient;
     private final CabeceraLiquiPrestacionRepository cabeceraLiquiPrestacionRepository;
     private final DetalleLiquiPrestacionRepository detalleLiquiPrestacionRepository;
+    private final NominaCabeceraRepository nominaCabeceraRepository;
+    private final ReporteNominaDetalleRepository reporteNominaDetalleRepository;
 
     @Override
     @Transactional
@@ -41,25 +47,16 @@ public class LiquidacionInteresesServiceImpl implements LiquidacionInteresesServ
                 proceso.getProcesoLiquiId());
 
         List<ConceptoNominaDTO> todosConceptos = masterDataClient.findAllConceptosNomina();
-
         Map<String, ConceptoNominaDTO> conceptosPorNombre = todosConceptos.stream()
                 .collect(Collectors.toMap(ConceptoNominaDTO::nombreConcepNomina, c -> c));
 
         List<EmpleadoDTO> empleadosActivos = masterDataClient
                 .findEmpleadosActivos(proceso.getFkIdEmpresa());
-
         Map<Long, EmpleadoDTO> empleadosPorId = empleadosActivos.stream()
                 .collect(Collectors.toMap(EmpleadoDTO::empleadoId, e -> e));
 
         LocalDate fechaInicio = proceso.getFechaInicioPeriodo();
         LocalDate fechaFin = proceso.getFechaFinPeriodo();
-
-        // Buscar el proceso de cesantías del mismo año para leer las cesantías acumuladas
-        List<DetalleLiquiPrestacion> cesantiasAnio = detalleLiquiPrestacionRepository
-                .findHistoricoByEmpleadoAndAnio(
-                        empleadosSeleccionados.get(0),
-                        proceso.getAnio()
-                );
 
         CabeceraLiquiPrestacion cabecera = new CabeceraLiquiPrestacion();
         cabecera.setFkProcesoLiquiId(proceso.getProcesoLiquiId());
@@ -90,8 +87,7 @@ public class LiquidacionInteresesServiceImpl implements LiquidacionInteresesServ
             }
         }
 
-        log.info("Liquidación intereses completada - proceso: {}",
-                proceso.getProcesoLiquiId());
+        log.info("Liquidación intereses completada - proceso: {}", proceso.getProcesoLiquiId());
     }
 
     private void procesarEmpleado(
@@ -111,25 +107,7 @@ public class LiquidacionInteresesServiceImpl implements LiquidacionInteresesServ
         }
 
         if (Boolean.TRUE.equals(empleado.esSalarioIntegral())) {
-            log.debug("Empleado {} tiene salario integral, se omiten intereses ordinarios",
-                    empleadoId);
-            return;
-        }
-
-        // Leer cesantías acumuladas del proceso de cesantías del mismo año
-        List<DetalleLiquiPrestacion> detallesCesantias = detalleLiquiPrestacionRepository
-                .findHistoricoByEmpleadoAndAnio(empleadoId, proceso.getAnio());
-
-        BigDecimal cesantiasAcumuladas = detallesCesantias.stream()
-                .filter(d -> {
-                    ConceptoNominaDTO c = conceptosPorNombre.get("Cesantías");
-                    return c != null && c.concepNominaId().equals(d.getFkConcepNominaId());
-                })
-                .map(DetalleLiquiPrestacion::getValorNetaPresta)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
-
-        if (cesantiasAcumuladas.compareTo(BigDecimal.ZERO) == 0) {
-            log.debug("Empleado {} sin cesantías acumuladas, se omiten intereses", empleadoId);
+            log.debug("Empleado {} tiene salario integral, se omiten intereses", empleadoId);
             return;
         }
 
@@ -138,8 +116,48 @@ public class LiquidacionInteresesServiceImpl implements LiquidacionInteresesServ
                 ? fechaIngreso
                 : fechaInicioPeriodo;
 
-        int diasLiquidados = LiquidacionFechaUtils.calcularDias(fechaInicioReal, fechaFinPeriodo);
-        diasLiquidados = Math.min(diasLiquidados, DIAS_ANIO);
+        // Nóminas pagadas del año
+        List<NominaCabecera> nominasAnio = nominaCabeceraRepository
+                .findByEmpleadoAndRangoPeriodo(
+                        empleadoId, proceso.getAnio(), 1, 12, EstadoProceso.PAGADO
+                );
+
+        // Días laborados reales
+        int diasLiquidados;
+        if (!nominasAnio.isEmpty()) {
+            diasLiquidados = nominasAnio.stream()
+                    .mapToInt(nc -> reporteNominaDetalleRepository
+                            .findByFkCabecNominaId(nc.getCabecNominaId())
+                            .stream()
+                            .filter(d -> d.getFkConcepNominaId() != null &&
+                                    d.getFkConcepNominaId().equals(1L))
+                            .mapToInt(d -> d.getCantidadConcept() != null
+                                    ? d.getCantidadConcept() : 0)
+                            .sum())
+                    .sum();
+            diasLiquidados = Math.min(diasLiquidados, DIAS_ANIO);
+        } else {
+            diasLiquidados = LiquidacionFechaUtils.calcularDias(fechaInicioReal, fechaFinPeriodo);
+            diasLiquidados = Math.min(diasLiquidados, DIAS_ANIO);
+        }
+
+        // Leer cesantías acumuladas del proceso de cesantías del mismo año
+        List<DetalleLiquiPrestacion> detallesCesantias = detalleLiquiPrestacionRepository
+                .findHistoricoByEmpleadoAndAnio(empleadoId, proceso.getAnio());
+
+        ConceptoNominaDTO conceptoCesantias = conceptosPorNombre.get("Cesantías");
+
+        BigDecimal cesantiasAcumuladas = detallesCesantias.stream()
+                .filter(d -> conceptoCesantias != null &&
+                        conceptoCesantias.concepNominaId().equals(d.getFkConcepNominaId()))
+                .map(DetalleLiquiPrestacion::getValorNetaPresta)
+                .filter(v -> v != null)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        if (cesantiasAcumuladas.compareTo(BigDecimal.ZERO) == 0) {
+            log.debug("Empleado {} sin cesantías acumuladas, se omiten intereses", empleadoId);
+            return;
+        }
 
         // Fórmula: (cesantíasAcumuladas * diasLiquidados * 0.12) / 360
         BigDecimal valorIntereses = cesantiasAcumuladas
@@ -168,6 +186,4 @@ public class LiquidacionInteresesServiceImpl implements LiquidacionInteresesServ
         log.debug("Intereses cesantías empleado {}: días={}, cesantías={}, intereses={}",
                 empleadoId, diasLiquidados, cesantiasAcumuladas, valorIntereses);
     }
-
-
 }

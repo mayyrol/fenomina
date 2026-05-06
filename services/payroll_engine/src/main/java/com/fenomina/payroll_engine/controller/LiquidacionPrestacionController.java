@@ -66,16 +66,15 @@ public class LiquidacionPrestacionController {
         log.info("Liquidando cesantías - proceso: {}, usuario: {}", procesoId, usuarioId);
 
         ProcesoLiquidacion proceso = procesoService.findById(procesoId);
-
         validarTipoProceso(proceso, TipoProceso.CESANTIAS_ANUAL);
 
         liquidacionCesantiasService.liquidar(proceso, request.empleadosSeleccionados());
 
-        procesoService.cambiarEstado(
-                procesoId,
-                EstadoProceso.PENDIENTE_PAGO,
-                usuarioId
-        );
+        // Pasar por CERRADO solo si está en BORRADOR
+        if (proceso.getEstadoProcNomina() == EstadoProceso.BORRADOR) {
+            procesoService.cambiarEstado(procesoId, EstadoProceso.CERRADO, usuarioId);
+        }
+        procesoService.cambiarEstado(procesoId, EstadoProceso.PENDIENTE_PAGO, usuarioId);
 
         return ResponseEntity.ok(Map.of(
                 "mensaje", "Cesantías liquidadas exitosamente",
@@ -94,16 +93,15 @@ public class LiquidacionPrestacionController {
                 procesoId, usuarioId);
 
         ProcesoLiquidacion proceso = procesoService.findById(procesoId);
-
         validarTipoProceso(proceso, TipoProceso.INTERESES_CESANTIAS_ANUAL);
 
         liquidacionInteresesService.liquidar(proceso, request.empleadosSeleccionados());
 
-        procesoService.cambiarEstado(
-                procesoId,
-                EstadoProceso.PENDIENTE_PAGO,
-                usuarioId
-        );
+        // Pasar por CERRADO solo si está en BORRADOR
+        if (proceso.getEstadoProcNomina() == EstadoProceso.BORRADOR) {
+            procesoService.cambiarEstado(procesoId, EstadoProceso.CERRADO, usuarioId);
+        }
+        procesoService.cambiarEstado(procesoId, EstadoProceso.PENDIENTE_PAGO, usuarioId);
 
         return ResponseEntity.ok(Map.of(
                 "mensaje", "Intereses sobre cesantías liquidados exitosamente",
