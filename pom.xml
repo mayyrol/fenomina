@@ -17,6 +17,7 @@
         <module>services/auth-service</module>
         <module>services/master-data-service</module>
         <module>services/payroll_engine</module>
+        <module>services/historicos-service</module>
         <!-- Los 3 nuevos microservicios se añaden aqui -->
     </modules>
 
