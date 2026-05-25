@@ -14,7 +14,7 @@ public class ConceptoNominaLineaDTO {
     private String categoria;          // DEVENGO o DEDUCCION
     private Boolean esSalario;
     private Boolean esInformativo;
-    private Integer cantidad;          // días u horas según el tipo
+    private final BigDecimal cantidad;        // días u horas según el tipo
     private BigDecimal baseCalculo;
     private BigDecimal valorResultado;
 }

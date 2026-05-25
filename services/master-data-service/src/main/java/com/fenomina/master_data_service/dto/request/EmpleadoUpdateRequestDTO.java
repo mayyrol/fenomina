@@ -38,6 +38,8 @@ public record EmpleadoUpdateRequestDTO(
         @Digits(integer = 13, fraction = 2, message = "El salario tiene formato inválido")
         BigDecimal salarioBascMensual,
 
+        Boolean esSalarioIntegral,
+
         Boolean tieneAuxTransporte,
 
         @Size(max = 20, message = "La clase de riesgo no puede tener más de 5 caracteres")

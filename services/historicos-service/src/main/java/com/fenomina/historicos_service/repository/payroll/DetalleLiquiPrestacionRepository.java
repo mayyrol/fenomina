@@ -51,6 +51,7 @@ public interface DetalleLiquiPrestacionRepository extends JpaRepository<DetalleL
         WHERE pl.fk_id_empresa = :empresaId
           AND clp.deleted_at IS NULL
           AND emp.deleted_at IS NULL
+          AND pl.estado_proc_nomina = 'PAGADO'
           AND (:tipoProceso IS NULL OR pl.tipo_proceso = :tipoProceso)
           AND (:anio IS NULL OR clp.anio_liqui_prestacion = :anio)
           AND (:periodo IS NULL OR clp.periodo_liqui_prestacion = :periodo)
@@ -97,6 +98,7 @@ public interface DetalleLiquiPrestacionRepository extends JpaRepository<DetalleL
             ON clp.fk_proceso_liqui_id = pl.proceso_liqui_id
         WHERE pl.fk_id_empresa = :empresaId
           AND clp.deleted_at IS NULL
+          AND pl.estado_proc_nomina = 'PAGADO'        
           AND (:tipoProceso IS NULL OR pl.tipo_proceso = :tipoProceso)
           AND (:anio IS NULL OR clp.anio_liqui_prestacion = :anio)
           AND (:periodo IS NULL OR clp.periodo_liqui_prestacion = :periodo)

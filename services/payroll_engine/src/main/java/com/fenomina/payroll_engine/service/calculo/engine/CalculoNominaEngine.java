@@ -31,7 +31,6 @@ import java.util.stream.Collectors;
 public class CalculoNominaEngine {
 
     private static final int ESCALA = 2;
-    private static final String ESTADO_ACTIVO = "ACTIVO";
     private static final String LICENCIA_NO_REMUNERADA = "Licencias no remuneradas";
 
     private final IBCCalculator ibcCalculator;
@@ -151,6 +150,22 @@ public class CalculoNominaEngine {
         Integer diasLicenciaNoRemunerada = calcularDiasLicenciaNoRemunerada(
                 novedades, conceptosPorNombre);
 
+        int diasAusencia = calcularDiasAusencia(novedades, conceptosPorId);
+        int diasQueRecuperanIbc = calcularDiasQueRecuperanIbc(novedades, conceptosPorId);
+        int diasLaboradosBrutos = diasLaborados + diasQueRecuperanIbc;
+        int maximoPeriodo = proceso.getTipoProceso() ==
+                com.fenomina.payroll_engine.enums.TipoProceso.NOMINA_QUINCENAL ? 15 : 30;
+
+        if (diasAusencia > 0 && (diasLaborados + diasAusencia) > maximoPeriodo) {
+            throw new CalculoNominaException(
+                    String.format(
+                            "Empleado %d: la suma de días laborados ingresados (%d) y días de " +
+                                    "ausencia registrados en novedades (%d) supera el máximo del período " +
+                                    "(%d días). Verifique los días laborados ingresados.",
+                            empleadoId, diasLaborados, diasAusencia, maximoPeriodo
+                    )
+            );
+        }
         // --- d. Construir contexto ---
         ContextoLiquidacion ctx = ContextoLiquidacion.builder()
                 .empleado(empleado)
@@ -171,6 +186,8 @@ public class CalculoNominaEngine {
                 .ibcSaludAnterior(ibcSaludAnterior)
                 .ibcPensionAnterior(ibcPensionAnterior)
                 .esEmpresaExoneradaParafiscales(empresa.esExoneradaLey1607())
+                .diasAusencia(diasAusencia)
+                .diasLaboradosBrutos(diasLaboradosBrutos)
                 .build();
 
         // --- e. Ejecutar calculators en orden ---
@@ -182,12 +199,18 @@ public class CalculoNominaEngine {
                 .map(DevengoCalculado::getValorResultado)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
-        IBCCalculado ibc = ibcCalculator.calcular(ctx, totalDevengadoSalarial);
+        BigDecimal baseIbc = devengos.stream()
+                .filter(d -> !d.isEsInformativo())
+                .filter(DevengoCalculado::isEsIbc)
+                .map(DevengoCalculado::getValorResultado)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        IBCCalculado ibc = ibcCalculator.calcular(ctx, baseIbc);
 
         List<DeduccionCalculada> deducciones = deduccionesCalculator.calcular(ctx, ibc);
 
         List<AportePatronalCalculado> aportesPatronales =
-                seguridadSocialCalculator.calcular(ctx, ibc);
+                seguridadSocialCalculator.calcular(ctx, ibc, totalDevengadoSalarial);
 
         List<ProvisionCalculada> provisiones = provisionesCalculator.calcular(ctx, devengos);
 
@@ -240,28 +263,9 @@ public class CalculoNominaEngine {
 
         cabecera = nominaCabeceraRepository.save(cabecera);
 
-        // --- h. Persistir detalles ---
-        // --- h. Persistir detalles ---
         List<ReporteNominaDetalle> detalles = new ArrayList<>();
 
         detalles.addAll(mapearDevengos(devengos, cabecera.getCabecNominaId()));
-
-// LOGS AQUÍ - antes de mapear
-        deducciones.forEach(d ->
-                log.debug("Deduccion a mapear: '{}' -> existe: {}",
-                        d.getNombreConcepto(),
-                        conceptosPorNombre.containsKey(d.getNombreConcepto()))
-        );
-        aportesPatronales.forEach(a ->
-                log.debug("Aporte patronal a mapear: '{}' -> existe: {}",
-                        a.getNombreConcepto(),
-                        conceptosPorNombre.containsKey(a.getNombreConcepto()))
-        );
-        provisiones.forEach(p ->
-                log.debug("Provision a mapear: '{}' -> existe: {}",
-                        p.getNombreConcepto(),
-                        conceptosPorNombre.containsKey(p.getNombreConcepto()))
-        );
 
 // MAPEOS DESPUÉS
         detalles.addAll(mapearDeducciones(deducciones, cabecera.getCabecNominaId(),
@@ -320,14 +324,22 @@ public class CalculoNominaEngine {
             Long cabecNominaId
     ) {
         return devengos.stream()
-                .map(d -> ReporteNominaDetalle.builder()
-                        .fkCabecNominaId(cabecNominaId)
-                        .fkConcepNominaId(d.getConcepNominaId())
-                        .fkNovedadId(d.getNovedadId())
-                        .cantidadConcept(d.getCantidad())
-                        .baseCalculoConcept(d.getBaseCalculo())
-                        .valorResultConcept(d.getValorResultado())
-                        .build())
+                .map(d -> {
+                    BigDecimal cantidad = null;
+                    if (d.getCantidad() != null) {
+                        cantidad = BigDecimal.valueOf(d.getCantidad());
+                    } else if (d.getCantidadHoras() != null) {
+                        cantidad = d.getCantidadHoras();
+                    }
+                    return ReporteNominaDetalle.builder()
+                            .fkCabecNominaId(cabecNominaId)
+                            .fkConcepNominaId(d.getConcepNominaId())
+                            .fkNovedadId(d.getNovedadId())
+                            .cantidadConcept(cantidad)
+                            .baseCalculoConcept(d.getBaseCalculo())
+                            .valorResultConcept(d.getValorResultado())
+                            .build();
+                })
                 .collect(Collectors.toList());
     }
 
@@ -337,13 +349,12 @@ public class CalculoNominaEngine {
             Map<String, ConceptoNominaDTO> conceptosPorNombre
     ) {
         return deducciones.stream()
+                .filter(d -> !d.isEsAporteLicenciaNoRemunerada())
                 .map(d -> {
-                    ConceptoNominaDTO concepto = conceptosPorNombre
-                            .get(d.getNombreConcepto());
+                    ConceptoNominaDTO concepto = conceptosPorNombre.get(d.getNombreConcepto());
                     return ReporteNominaDetalle.builder()
                             .fkCabecNominaId(cabecNominaId)
-                            .fkConcepNominaId(concepto != null
-                                    ? concepto.concepNominaId() : null)
+                            .fkConcepNominaId(concepto != null ? concepto.concepNominaId() : null)
                             .fkNovedadId(d.getNovedadId())
                             .cantidadConcept(null)
                             .baseCalculoConcept(d.getBaseCalculo())
@@ -359,13 +370,12 @@ public class CalculoNominaEngine {
             Map<String, ConceptoNominaDTO> conceptosPorNombre
     ) {
         return aportes.stream()
+                .filter(a -> !a.isEsAporteLicenciaNoRemunerada())
                 .map(a -> {
-                    ConceptoNominaDTO concepto = conceptosPorNombre
-                            .get(a.getNombreConcepto());
+                    ConceptoNominaDTO concepto = conceptosPorNombre.get(a.getNombreConcepto());
                     return ReporteNominaDetalle.builder()
                             .fkCabecNominaId(cabecNominaId)
-                            .fkConcepNominaId(concepto != null
-                                    ? concepto.concepNominaId() : null)
+                            .fkConcepNominaId(concepto != null ? concepto.concepNominaId() : null)
                             .cantidadConcept(null)
                             .baseCalculoConcept(a.getBaseCalculo())
                             .valorResultConcept(a.getValorResultado())
@@ -393,5 +403,64 @@ public class CalculoNominaEngine {
                             .build();
                 })
                 .collect(Collectors.toList());
+    }
+
+    private static final List<String> CONCEPTOS_DESCUENTAN_DIAS = List.of(
+            "Incapacidad por enfermedad general",
+            "Incapacidad por origen laboral",
+            "Licencia de maternidad",
+            "Licencia de paternidad",
+            "Licencia por calamidad doméstica",
+            "Licencia por matrimonio",
+            "Licencia Ley ISAAC",
+            "Licencia por sufragio",
+            "Cargos transitorios",
+            "Citaciones judiciales",
+            "Otros permisos remunerados pactados",
+            "Licencias no remuneradas",
+            "Vacaciones disfrutadas"
+    );
+
+    private int calcularDiasAusencia(
+            List<Novedad> novedades,
+            Map<Long, ConceptoNominaDTO> conceptosPorId
+    ) {
+        return novedades.stream()
+                .filter(n -> {
+                    ConceptoNominaDTO concepto = conceptosPorId.get(n.getFkConcepNominaId());
+                    return concepto != null
+                            && CONCEPTOS_DESCUENTAN_DIAS.contains(concepto.nombreConcepNomina());
+                })
+                .mapToInt(n -> n.getCantidadDiasNovedad() != null
+                        ? n.getCantidadDiasNovedad() : 0)
+                .sum();
+    }
+    private static final List<String> CONCEPTOS_RECUPERAN_IBC = List.of(
+            "Incapacidad por enfermedad general",
+            "Incapacidad por origen laboral",
+            "Licencia de maternidad",
+            "Licencia de paternidad",
+            "Licencia por calamidad doméstica",
+            "Licencia por matrimonio",
+            "Licencia Ley ISAAC",
+            "Licencia por sufragio",
+            "Cargos transitorios",
+            "Citaciones judiciales",
+            "Otros permisos remunerados pactados"
+    );
+
+    private int calcularDiasQueRecuperanIbc(
+            List<Novedad> novedades,
+            Map<Long, ConceptoNominaDTO> conceptosPorId
+    ) {
+        return novedades.stream()
+                .filter(n -> {
+                    ConceptoNominaDTO concepto = conceptosPorId.get(n.getFkConcepNominaId());
+                    return concepto != null
+                            && CONCEPTOS_RECUPERAN_IBC.contains(concepto.nombreConcepNomina());
+                })
+                .mapToInt(n -> n.getCantidadDiasNovedad() != null
+                        ? n.getCantidadDiasNovedad() : 0)
+                .sum();
     }
 }

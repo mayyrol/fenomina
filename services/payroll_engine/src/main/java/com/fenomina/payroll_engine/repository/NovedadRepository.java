@@ -35,10 +35,20 @@ public interface NovedadRepository extends JpaRepository<Novedad, Long> {
     );
 
     // Verifica si ya existe una novedad del mismo concepto para el empleado en el periodo
-    boolean existsByFkEmpleadoIdAndFkConcepNominaIdAndAnioAndPeriodo(
-            Long fkEmpleadoId,
-            Long fkConcepNominaId,
-            Integer anio,
-            Integer periodo
+    @Query("""
+        SELECT COUNT(n) > 0 FROM Novedad n
+        LEFT JOIN ProcesoLiquidacion p ON p.procesoLiquiId = n.procesoLiquid
+        WHERE n.fkEmpleadoId = :fkEmpleadoId
+        AND n.fkConcepNominaId = :fkConcepNominaId
+        AND n.anio = :anio
+        AND n.periodo = :periodo
+        AND (p IS NULL 
+             OR p.estadoProcNomina != com.fenomina.payroll_engine.enums.EstadoProceso.ANULADO)
+        """)
+    boolean existsNovedadActivaByEmpleadoAndConceptoAndPeriodo(
+            @Param("fkEmpleadoId") Long fkEmpleadoId,
+            @Param("fkConcepNominaId") Long fkConcepNominaId,
+            @Param("anio") Integer anio,
+            @Param("periodo") Integer periodo
     );
 }

@@ -17,6 +17,7 @@ public interface CabeceraLiquiPrestacionRepository extends JpaRepository<Cabecer
         WHERE pl.fkIdEmpresa = :empresaId
           AND (:anio IS NULL OR c.anioLiquiPrestacion = :anio)
           AND (:periodo IS NULL OR c.periodoLiquiPrestacion = :periodo)
+          AND pl.estadoProcNomina = 'PAGADO'
         ORDER BY c.anioLiquiPrestacion DESC, c.periodoLiquiPrestacion DESC
         """)
     Page<CabeceraLiquiPrestacion> findByEmpresaYFiltros(

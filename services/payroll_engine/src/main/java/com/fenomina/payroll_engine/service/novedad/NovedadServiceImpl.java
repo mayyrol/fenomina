@@ -30,13 +30,13 @@ public class NovedadServiceImpl implements NovedadService {
     private final NovedadValidator novedadValidator;
 
     private static final List<String> CONCEPTOS_PERMITE_DUPLICADO = List.of(
-            "Recargo nocturno lunes a sábado",
-            "Recargo diurno domingo o festivo",
-            "Recargo nocturno domingo o festivo",
-            "Hora extra diurna lunes a sábado",
-            "Hora extra nocturna lunes a sábado",
-            "Hora extra diurna dominical o festivo",
-            "Hora extra nocturna dominical o festivo",
+            "Recargo nocturno ordinario",
+            "Recargo diurno dominical o festivo",
+            "Recargo nocturno dominical o festivo",
+            "Hora extra diurna ordinaria",
+            "Hora extra nocturna ordinaria",
+            "Hora extra diurna dominical o festiva",
+            "Hora extra nocturna dominical o festiva",
             "Otro concepto a devenir salarial",
             "Otro concepto a devenir no salarial",
             "Otros conceptos a deducir salariales",
@@ -60,6 +60,7 @@ public class NovedadServiceImpl implements NovedadService {
                         String.format("Concepto de nómina no encontrado: %d",
                                 novedad.getFkConcepNominaId())
                 ));
+        completarDiasDesdeFechas(novedad);
 
         novedadValidator.validarNovedad(
                 novedad,
@@ -92,6 +93,8 @@ public class NovedadServiceImpl implements NovedadService {
                         String.format("Concepto de nómina no encontrado: %d",
                                 novedadActualizada.getFkConcepNominaId())
                 ));
+
+        completarDiasDesdeFechas(novedadActualizada);
 
         novedadValidator.validarNovedad(
                 novedadActualizada,
@@ -174,12 +177,28 @@ public class NovedadServiceImpl implements NovedadService {
         return proceso;
     }
 
+    private void completarDiasDesdeFechas(Novedad novedad) {
+        if (novedad.getCantidadDiasNovedad() != null
+                && novedad.getCantidadDiasNovedad() > 0) {
+            return; // Ya viene calculado, no sobrescribir
+        }
+
+        if (novedad.getFechaInicioAusen() != null
+                && novedad.getFechaFinAusen() != null) {
+            long dias = java.time.temporal.ChronoUnit.DAYS.between(
+                    novedad.getFechaInicioAusen(),
+                    novedad.getFechaFinAusen()
+            ) + 1;
+            novedad.setCantidadDiasNovedad((int) dias);
+        }
+    }
+
     private void validarNovedadDuplicada(Novedad novedad, String nombreConcepto) {
         if (CONCEPTOS_PERMITE_DUPLICADO.contains(nombreConcepto)) {
             return;
         }
 
-        boolean existe = novedadRepository.existsByFkEmpleadoIdAndFkConcepNominaIdAndAnioAndPeriodo(
+        boolean existe = novedadRepository.existsNovedadActivaByEmpleadoAndConceptoAndPeriodo(
                 novedad.getFkEmpleadoId(),
                 novedad.getFkConcepNominaId(),
                 novedad.getAnio(),

@@ -25,6 +25,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.util.List;
 
@@ -65,10 +66,23 @@ public class EmpleadoServiceImpl implements EmpleadoService {
         empleado.setEmpresa(empresa);
 
         // 4. Calcular si es salario integral
-        boolean esSalarioIntegral = salarioCalculator.esSalarioIntegral(
-                request.salarioBascMensual(),
-                request.fechaIngresoEmp()
-        );
+        boolean esSalarioIntegral = Boolean.TRUE.equals(request.esSalarioIntegral());
+
+        if (esSalarioIntegral) {
+            BigDecimal smmlv = salarioCalculator.obtenerSMMLVVigente(request.fechaIngresoEmp());
+            BigDecimal tope = smmlv.multiply(BigDecimal.valueOf(13));
+            if (request.salarioBascMensual().compareTo(tope) < 0) {
+                throw new IllegalArgumentException(
+                        String.format(
+                                "El salario integral debe ser igual o superior a 13 SMMLV ($%s). " +
+                                        "El salario ingresado ($%s) no cumple el requisito mínimo legal.",
+                                tope.setScale(0, RoundingMode.HALF_UP),
+                                request.salarioBascMensual().setScale(0, RoundingMode.HALF_UP)
+                        )
+                );
+            }
+        }
+
         empleado.setEsSalarioIntegral(esSalarioIntegral);
 
         // 5.
@@ -152,11 +166,24 @@ public class EmpleadoServiceImpl implements EmpleadoService {
             log.info("Salario modificado de {} a {} para empleado ID: {}",
                     salarioAnterior, request.salarioBascMensual(), id);
 
-            boolean esSalarioIntegral = salarioCalculator.esSalarioIntegral(
-                    request.salarioBascMensual(),
-                    LocalDate.now()
-            );
-            empleado.setEsSalarioIntegral(esSalarioIntegral);
+            if (request.esSalarioIntegral() != null) {
+                boolean esSalarioIntegral = Boolean.TRUE.equals(request.esSalarioIntegral());
+                if (esSalarioIntegral) {
+                    BigDecimal smmlv = salarioCalculator.obtenerSMMLVVigente(LocalDate.now());
+                    BigDecimal tope = smmlv.multiply(BigDecimal.valueOf(13));
+                    if (request.salarioBascMensual().compareTo(tope) < 0) {
+                        throw new IllegalArgumentException(
+                                String.format(
+                                        "El salario integral debe ser igual o superior a 13 SMMLV ($%s). " +
+                                                "El salario ingresado ($%s) no cumple el requisito mínimo legal.",
+                                        tope.setScale(0, RoundingMode.HALF_UP),
+                                        request.salarioBascMensual().setScale(0, RoundingMode.HALF_UP)
+                                )
+                        );
+                    }
+                }
+                empleado.setEsSalarioIntegral(esSalarioIntegral);
+            }
 
             crearHistorialSalario(empleado, salarioAnterior, request.salarioBascMensual());
         }

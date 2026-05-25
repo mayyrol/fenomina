@@ -61,7 +61,7 @@ public class IBCCalculator {
             ibc = totalDevengadoSalarial.setScale(ESCALA, RoundingMode.HALF_UP);
         }
 
-        ibc = aplicarTopes(ibc, smmlv, topeIbc, ctx.getDiasLaborados());
+        ibc = aplicarTopes(ibc, smmlv, topeIbc, ctx.getDiasLaboradosBrutos());
 
         boolean cotizaPension = cotizaPension(subtipoCotizante);
         boolean cotizaSalud = cotizaSalud(subtipoCotizante);
@@ -91,10 +91,7 @@ public class IBCCalculator {
 
         BigDecimal ibc = aplicarTopes(
                 totalDevengadoSalarial.setScale(ESCALA, RoundingMode.HALF_UP),
-                smmlv,
-                topeIbc,
-                ctx.getDiasLaborados()
-        );
+                smmlv, topeIbc, ctx.getDiasLaboradosBrutos());
 
         return IBCCalculado.builder()
                 .ibcSalud(ibc)
@@ -142,7 +139,7 @@ public class IBCCalculator {
                 .multiply(FACTOR_IBC_INDEPENDIENTE)
                 .setScale(ESCALA, RoundingMode.HALF_UP);
 
-        ibc = aplicarTopes(ibc, smmlv, topeIbc, ctx.getDiasLaborados());
+        ibc = aplicarTopes(ibc, smmlv, topeIbc, ctx.getDiasLaboradosBrutos());
 
         boolean cotizaPension = cotizaPension(subtipoCotizante);
 

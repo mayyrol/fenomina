@@ -144,7 +144,7 @@ public class LiquidacionCesantiasServiceImpl implements LiquidacionCesantiasServ
                             .filter(d -> d.getFkConcepNominaId() != null &&
                                     d.getFkConcepNominaId().equals(1L))
                             .mapToInt(d -> d.getCantidadConcept() != null
-                                    ? d.getCantidadConcept() : 0)
+                                    ? d.getCantidadConcept().intValue() : 0)
                             .sum())
                     .sum();
             diasLiquidados = Math.min(diasLiquidados, DIAS_ANIO);
@@ -168,12 +168,12 @@ public class LiquidacionCesantiasServiceImpl implements LiquidacionCesantiasServ
                 .multiply(BigDecimal.valueOf(diasLiquidados))
                 .divide(BigDecimal.valueOf(DIAS_ANIO), ESCALA, RoundingMode.HALF_UP);
 
-        // --- Intereses sobre cesantías ---
-        // Fórmula: (cesantías * días * 0.12) / 360
+        // Fórmula: cesantías acumuladas × 0.12 (tasa anual directa sobre el saldo)
+        // Equivalente a (cesantías × días × 0.12) / 360 donde cesantías = base×días/360
+        // pero el saldo ya contiene los días, así que solo se aplica la tasa
         BigDecimal valorIntereses = valorCesantias
-                .multiply(BigDecimal.valueOf(diasLiquidados))
                 .multiply(new BigDecimal("0.12"))
-                .divide(BigDecimal.valueOf(DIAS_ANIO), ESCALA, RoundingMode.HALF_UP);
+                .setScale(ESCALA, RoundingMode.HALF_UP);
 
         // --- Persistir detalle cesantías ---
         ConceptoNominaDTO conceptoCesantias = conceptosPorNombre.get("Cesantías");

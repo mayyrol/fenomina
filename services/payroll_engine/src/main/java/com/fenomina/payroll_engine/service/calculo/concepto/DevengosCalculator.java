@@ -17,10 +17,23 @@ public class DevengosCalculator {
 
     private static final int ESCALA = 2;
     private static final BigDecimal DIAS_MES = BigDecimal.valueOf(30);
-    private static final BigDecimal DIAS_ANIO_VACACIONES = BigDecimal.valueOf(720);
     private static final BigDecimal PORCENTAJE_INCAPACIDAD_COMUN = new BigDecimal("0.6666");
     private static final BigDecimal PORCENTAJE_INCAPACIDAD_LABORAL = BigDecimal.ONE;
     private static final int DIAS_EMPLEADOR_INCAPACIDAD_COMUN = 2;
+
+
+    private BigDecimal calcularValorHoraOrdinaria(ContextoLiquidacion ctx) {
+        BigDecimal horasMes = ctx.getParametrosPorNombre()
+                .get("HORAS_TRABAJADAS_MES").valorParamGeneral();
+        BigDecimal valorCalculado = ctx.getEmpleado().salarioBascMensual()
+                .divide(horasMes, ESCALA, RoundingMode.HALF_UP);
+
+        // El valor hora nunca puede ser inferior al mínimo legal
+        BigDecimal valorMinimo = ctx.getParametrosPorNombre()
+                .get("VALOR_HORA_ORDINARIA").valorParamGeneral();
+
+        return valorCalculado.max(valorMinimo);
+    }
 
     public List<DevengoCalculado> calcular(ContextoLiquidacion ctx) {
         List<DevengoCalculado> devengos = new ArrayList<>();
@@ -123,15 +136,15 @@ public class DevengosCalculator {
         String nombre = concepto.nombreConcepNomina();
 
         return switch (nombre) {
-            case "Hora extra diurna lunes a sábado",
-                 "Hora extra nocturna lunes a sábado",
-                 "Hora extra diurna dominical o festivo",
-                 "Hora extra nocturna dominical o festivo" ->
+            case "Hora extra diurna ordinaria",
+                 "Hora extra nocturna ordinaria",
+                 "Hora extra diurna dominical o festiva",
+                 "Hora extra nocturna dominical o festiva" ->
                     calcularHoraExtra(ctx, novedad, concepto, nombre);
 
-            case "Recargo nocturno lunes a sábado",
-                 "Recargo diurno domingo o festivo",
-                 "Recargo nocturno domingo o festivo" ->
+            case "Recargo nocturno ordinario",
+                 "Recargo diurno dominical o festivo",
+                 "Recargo nocturno dominical o festivo" ->
                     calcularRecargo(ctx, novedad, concepto, nombre);
 
             case "Incapacidad por enfermedad general" ->
@@ -185,14 +198,13 @@ public class DevengosCalculator {
             ConceptoNominaDTO concepto,
             String nombre
     ) {
-        BigDecimal valorHora = ctx.getParametrosPorNombre()
-                .get("VALOR_HORA_ORDINARIA").valorParamGeneral();
+        BigDecimal valorHora = calcularValorHoraOrdinaria(ctx);
 
         String claveParam = switch (nombre) {
-            case "Hora extra diurna lunes a sábado" -> "EXTRA_DIURNA";
-            case "Hora extra nocturna lunes a sábado" -> "EXTRA_NOCTURNA";
-            case "Hora extra diurna dominical o festivo" -> "EXTRA_DIURNA_DOMINICAL";
-            case "Hora extra nocturna dominical o festivo" -> "EXTRA_NOCTURNA_DOMINICAL";
+            case "Hora extra diurna ordinaria" -> "EXTRA_DIURNA";
+            case "Hora extra nocturna ordinaria" -> "EXTRA_NOCTURNA";
+            case "Hora extra diurna dominical o festiva" -> "EXTRA_DIURNA_DOMINICAL";
+            case "Hora extra nocturna dominical o festiva" -> "EXTRA_NOCTURNA_DOMINICAL";
             default -> throw new IllegalArgumentException("Hora extra no reconocida: " + nombre);
         };
 
@@ -227,13 +239,12 @@ public class DevengosCalculator {
             ConceptoNominaDTO concepto,
             String nombre
     ) {
-        BigDecimal valorHora = ctx.getParametrosPorNombre()
-                .get("VALOR_HORA_ORDINARIA").valorParamGeneral();
+        BigDecimal valorHora = calcularValorHoraOrdinaria(ctx);
 
         String claveParam = switch (nombre) {
-            case "Recargo nocturno lunes a sábado" -> "RECARGO_NOCTURNO";
-            case "Recargo diurno domingo o festivo" -> "RECARGO_DIURNO_DOMINICAL";
-            case "Recargo nocturno domingo o festivo" -> "RECARGO_NOCTURNO_DOMINICAL";
+            case "Recargo nocturno ordinario" -> "RECARGO_NOCTURNO";
+            case "Recargo diurno dominical o festivo" -> "RECARGO_DIURNO_DOMINICAL";
+            case "Recargo nocturno dominical o festivo" -> "RECARGO_NOCTURNO_DOMINICAL";
             default -> throw new IllegalArgumentException("Recargo no reconocido: " + nombre);
         };
 
@@ -275,12 +286,9 @@ public class DevengosCalculator {
 
         if (diasEmpleador == 0) return null;
 
-        // Base: IBC del periodo anterior
-        BigDecimal ibcBase = ctx.getIbcSaludAnterior() != null
-                ? ctx.getIbcSaludAnterior()
-                : ctx.getEmpleado().salarioBascMensual();
-
-        BigDecimal valorDia = ibcBase.divide(DIAS_MES, ESCALA, RoundingMode.HALF_UP);
+        // Días 1-2: empleador paga al 100% del salario ordinario (no del IBC)
+        BigDecimal salarioBase = ctx.getEmpleado().salarioBascMensual();
+        BigDecimal valorDia = salarioBase.divide(DIAS_MES, ESCALA, RoundingMode.HALF_UP);
         BigDecimal valorEmpleador = valorDia
                 .multiply(BigDecimal.valueOf(diasEmpleador))
                 .setScale(ESCALA, RoundingMode.HALF_UP);
@@ -297,7 +305,7 @@ public class DevengosCalculator {
                 .concepNominaId(concepto.concepNominaId())
                 .nombreConcepto(concepto.nombreConcepNomina())
                 .cantidad(diasEmpleador)
-                .baseCalculo(ibcBase)
+                .baseCalculo(salarioBase)
                 .valorResultado(valorEmpleador)
                 .esSalario(true)
                 .esIbc(true)
@@ -337,7 +345,7 @@ public class DevengosCalculator {
                 .baseCalculo(ibcBase)
                 .valorResultado(valorArl)
                 .esSalario(true)
-                .esIbc(true)
+                .esIbc(false)
                 .esAuxilioTransporte(false)
                 .esInformativo(true)
                 .novedadId(novedad.getNovedadId())
@@ -360,9 +368,10 @@ public class DevengosCalculator {
         int dias = novedad.getCantidadDiasNovedad() != null
                 ? novedad.getCantidadDiasNovedad() : 0;
 
-        BigDecimal valor = salario
+        BigDecimal valorDia = salario.divide(DIAS_MES, ESCALA, RoundingMode.HALF_UP);
+        BigDecimal valor = valorDia
                 .multiply(BigDecimal.valueOf(dias))
-                .divide(DIAS_ANIO_VACACIONES, ESCALA, RoundingMode.HALF_UP);
+                .setScale(ESCALA, RoundingMode.HALF_UP);
 
         return DevengoCalculado.builder()
                 .concepNominaId(concepto.concepNominaId())
@@ -370,8 +379,8 @@ public class DevengosCalculator {
                 .cantidad(dias)
                 .baseCalculo(salario)
                 .valorResultado(valor)
-                .esSalario(false)
-                .esIbc(false)
+                .esSalario(true)
+                .esIbc(true)
                 .esAuxilioTransporte(false)
                 .novedadId(novedad.getNovedadId())
                 .build();
@@ -388,9 +397,10 @@ public class DevengosCalculator {
         int dias = novedad.getCantidadDiasNovedad() != null
                 ? novedad.getCantidadDiasNovedad() : 0;
 
-        BigDecimal valor = salario
+        BigDecimal valorDia = salario.divide(DIAS_MES, ESCALA, RoundingMode.HALF_UP);
+        BigDecimal valor = valorDia
                 .multiply(BigDecimal.valueOf(dias))
-                .divide(DIAS_ANIO_VACACIONES, ESCALA, RoundingMode.HALF_UP);
+                .setScale(ESCALA, RoundingMode.HALF_UP);
 
         return DevengoCalculado.builder()
                 .concepNominaId(concepto.concepNominaId())
@@ -447,15 +457,13 @@ public class DevengosCalculator {
             Novedad novedad,
             ConceptoNominaDTO concepto
     ) {
-        // Base: último IBC reportado antes del inicio de la licencia
-        BigDecimal ibcBase = ctx.getIbcSaludAnterior() != null
-                ? ctx.getIbcSaludAnterior()
-                : ctx.getEmpleado().salarioBascMensual();
+        // Licencias remuneradas a cargo del empleador: base es el salario ordinario actual
+        BigDecimal salarioBase = ctx.getEmpleado().salarioBascMensual();
+        BigDecimal valorDia = salarioBase.divide(DIAS_MES, ESCALA, RoundingMode.HALF_UP);
 
         int dias = novedad.getCantidadDiasNovedad() != null
                 ? novedad.getCantidadDiasNovedad() : 0;
 
-        BigDecimal valorDia = ibcBase.divide(DIAS_MES, ESCALA, RoundingMode.HALF_UP);
         BigDecimal valor = valorDia
                 .multiply(BigDecimal.valueOf(dias))
                 .setScale(ESCALA, RoundingMode.HALF_UP);
@@ -464,7 +472,7 @@ public class DevengosCalculator {
                 .concepNominaId(concepto.concepNominaId())
                 .nombreConcepto(concepto.nombreConcepNomina())
                 .cantidad(dias)
-                .baseCalculo(ibcBase)
+                .baseCalculo(salarioBase)
                 .valorResultado(valor)
                 .esSalario(true)
                 .esIbc(true)

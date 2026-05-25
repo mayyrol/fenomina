@@ -62,29 +62,27 @@ public class ReporteNominaService {
                 reporteNominaDetalleRepository.findByFkCabecNominaId(cabecNominaId);
 
         // Mapa de concepNominaId -> nombre del concepto para no hacer N queries
-        Map<Long, String> nombresConceptos = conceptoNominaRepository.findAll()
-                .stream()
+        List<com.fenomina.historicos_service.entity.master.ConceptoNomina> todosConceptos = conceptoNominaRepository.findAll();
+
+        Map<Long, String> nombresConceptos = todosConceptos.stream()
                 .collect(Collectors.toMap(
                         c -> c.getConcepNominaId(),
                         c -> c.getNombreConcepNomina()
                 ));
 
-        Map<Long, String> categoriasConceptos = conceptoNominaRepository.findAll()
-                .stream()
+        Map<Long, String> categoriasConceptos = todosConceptos.stream()
                 .collect(Collectors.toMap(
                         c -> c.getConcepNominaId(),
                         c -> c.getCategoriaConcNomina()
                 ));
 
-        Map<Long, Boolean> esSalarioMap = conceptoNominaRepository.findAll()
-                .stream()
+        Map<Long, Boolean> esSalarioMap = todosConceptos.stream()
                 .collect(Collectors.toMap(
                         c -> c.getConcepNominaId(),
                         c -> c.getEsSalario()
                 ));
 
-        Map<Long, Boolean> esInformativoMap = conceptoNominaRepository.findAll()
-                .stream()
+        Map<Long, Boolean> esInformativoMap = todosConceptos.stream()
                 .collect(Collectors.toMap(
                         c -> c.getConcepNominaId(),
                         c -> c.getEsInformativo()

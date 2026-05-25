@@ -155,7 +155,7 @@ public class LiquidacionPrimaServiceImpl implements LiquidacionPrimaService {
                             .filter(d -> d.getFkConcepNominaId() != null &&
                                     d.getFkConcepNominaId() == 1L)
                             .mapToInt(d -> d.getCantidadConcept() != null
-                                    ? d.getCantidadConcept() : 0)
+                                    ? d.getCantidadConcept().intValue() : 0)
                             .sum())
                     .sum();
             diasLiquidados = Math.min(diasLiquidados, DIAS_SEMESTRE);

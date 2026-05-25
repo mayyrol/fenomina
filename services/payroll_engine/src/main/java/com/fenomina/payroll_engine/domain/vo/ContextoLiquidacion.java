@@ -34,4 +34,6 @@ public class ContextoLiquidacion {
     private final BigDecimal ibcSaludAnterior;
     private final BigDecimal ibcPensionAnterior;
     private final Boolean esEmpresaExoneradaParafiscales;
+    private final Integer diasAusencia;
+    private final Integer diasLaboradosBrutos;
 }

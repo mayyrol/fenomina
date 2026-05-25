@@ -33,6 +33,7 @@ public interface ReporteNominaDetalleRepository extends JpaRepository<ReporteNom
         JOIN payroll.proceso_liquidacion pl ON nc.fk_proceso_liqui_id = pl.proceso_liqui_id
         WHERE pl.fk_id_empresa = :empresaId
           AND nc.deleted_at IS NULL
+          AND pl.estado_proc_nomina = 'PAGADO'
           AND emp.deleted_at IS NULL
           AND (:anio IS NULL OR nc.anio_cabec_nomina = :anio)
           AND (:periodo IS NULL OR nc.periodo_coti_nomina = :periodo)
@@ -47,7 +48,9 @@ public interface ReporteNominaDetalleRepository extends JpaRepository<ReporteNom
         JOIN master_data.empleado emp ON nc.fk_empleado_id = emp.empleado_id
         JOIN payroll.proceso_liquidacion pl ON nc.fk_proceso_liqui_id = pl.proceso_liqui_id
         WHERE pl.fk_id_empresa = :empresaId
-          AND nc.deleted_at IS NULL AND emp.deleted_at IS NULL
+          AND nc.deleted_at IS NULL
+          AND emp.deleted_at IS NULL
+          AND pl.estado_proc_nomina = 'PAGADO'
         """,
             nativeQuery = true)
     Page<Object[]> findReporteNominaEmpleados(
@@ -75,6 +78,7 @@ public interface ReporteNominaDetalleRepository extends JpaRepository<ReporteNom
     WHERE pl.fk_id_empresa = :empresaId
       AND rnd.fk_concep_nomina_id IN (:conceptoIds)
       AND nc.deleted_at IS NULL
+      AND pl.estado_proc_nomina = 'PAGADO'
       AND emp.deleted_at IS NULL
       AND (:anio IS NULL OR pl.anio = :anio)
       AND (:periodo IS NULL OR pl.periodo = :periodo)
@@ -110,6 +114,7 @@ public interface ReporteNominaDetalleRepository extends JpaRepository<ReporteNom
       AND rnd.fk_concep_nomina_id IN (:conceptoIds)
       AND nc.deleted_at IS NULL
       AND emp.deleted_at IS NULL
+      AND pl.estado_proc_nomina = 'PAGADO'    
       AND (:anio IS NULL OR pl.anio = :anio)
       AND (:periodo IS NULL OR pl.periodo = :periodo)
       AND (:documento IS NULL OR emp.documento_emp
@@ -168,7 +173,8 @@ public interface ReporteNominaDetalleRepository extends JpaRepository<ReporteNom
     WHERE pl.fk_id_empresa = :empresaId
       AND rnd.fk_concep_nomina_id IN (:conceptoIds)
       AND nc.deleted_at IS NULL
-      AND emp.deleted_at IS NULL
+      AND pl.estado_proc_nomina = 'PAGADO'    
+      AND emp.deleted_at IS NULL     
       AND (:anio IS NULL OR pl.anio = :anio)
       AND (:periodo IS NULL OR pl.periodo = :periodo)
       AND (:documento IS NULL OR emp.documento_emp
@@ -220,6 +226,7 @@ public interface ReporteNominaDetalleRepository extends JpaRepository<ReporteNom
     WHERE pl.fk_id_empresa = :empresaId
       AND rnd.fk_concep_nomina_id = :conceptoId
       AND nc.deleted_at IS NULL
+      AND pl.estado_proc_nomina = 'PAGADO'    
       AND emp.deleted_at IS NULL
       AND (:anio IS NULL OR pl.anio = :anio)
       AND (:periodo IS NULL OR pl.periodo = :periodo)

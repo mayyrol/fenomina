@@ -19,7 +19,8 @@ public class SeguridadSocialCalculator {
 
     public List<AportePatronalCalculado> calcular(
             ContextoLiquidacion ctx,
-            IBCCalculado ibc
+            IBCCalculado ibc,
+            BigDecimal totalDevengadoSalarial
     ) {
         List<AportePatronalCalculado> aportes = new ArrayList<>();
 
@@ -30,7 +31,7 @@ public class SeguridadSocialCalculator {
 
         // --- Salud empleador ---
         aportes.addAll(calcularAporteSalud(ctx, ibc, tipoCotizante,
-                subtipoCotizante, exoneradaParafiscales));
+                subtipoCotizante, exoneradaParafiscales, totalDevengadoSalarial));
 
         // --- Pensión empleador ---
         aportes.addAll(calcularAportePension(ctx, ibc, subtipoCotizante));
@@ -40,7 +41,7 @@ public class SeguridadSocialCalculator {
 
         // --- Parafiscales ---
         aportes.addAll(calcularAportesParafiscales(ctx, ibc, tipoCotizante,
-                subtipoCotizante, exoneradaParafiscales));
+                subtipoCotizante, exoneradaParafiscales, totalDevengadoSalarial));
 
         return aportes;
     }
@@ -52,7 +53,8 @@ public class SeguridadSocialCalculator {
             IBCCalculado ibc,
             String tipoCotizante,
             String subtipoCotizante,
-            boolean exoneradaParafiscales
+            boolean exoneradaParafiscales,
+            BigDecimal totalDevengadoSalarial
     ) {
         List<AportePatronalCalculado> aportes = new ArrayList<>();
 
@@ -71,23 +73,19 @@ public class SeguridadSocialCalculator {
         BigDecimal porcentajeSaludEmp = ctx.getParametrosPorNombre()
                 .get("SALUD_EMPLEADOR").porcentajeParamGeneral();
 
-        // Exoneración salud: empresa exonerada + salario < 10 SMMLV
+        // La ley habla de lo que el trabajador "devengue", no del salario base contractual
         boolean exoneradoSalud = exoneradaParafiscales
-                && ctx.getEmpleado().salarioBascMensual()
-                .compareTo(smmlv.multiply(DIEZ_SMMLV)) < 0;
+                && totalDevengadoSalarial.compareTo(smmlv.multiply(DIEZ_SMMLV)) < 0;
 
-        // Días trabajados normales
-        BigDecimal ibcSaludDiasTrabajados = calcularIbcProporcional(
-                ibc.getIbcSalud(), ctx.getDiasLaborados());
 
         if (!exoneradoSalud) {
-            BigDecimal valorSaludEmpleador = ibcSaludDiasTrabajados
+            BigDecimal valorSaludEmpleador = ibc.getIbcSalud()
                     .multiply(porcentajeSaludEmp)
                     .setScale(ESCALA, RoundingMode.HALF_UP);
 
             aportes.add(AportePatronalCalculado.builder()
                     .nombreConcepto("Aporte salud empleador")
-                    .baseCalculo(ibcSaludDiasTrabajados)
+                    .baseCalculo(ibc.getIbcSalud())
                     .porcentaje(porcentajeSaludEmp)
                     .valorResultado(valorSaludEmpleador)
                     .esAporteLicenciaNoRemunerada(false)
@@ -142,17 +140,14 @@ public class SeguridadSocialCalculator {
         BigDecimal porcentajePensionEmp = ctx.getParametrosPorNombre()
                 .get("PENSION_EMPLEADOR").porcentajeParamGeneral();
 
-        // Días trabajados normales
-        BigDecimal ibcPensionDiasTrabajados = calcularIbcProporcional(
-                ibc.getIbcPension(), ctx.getDiasLaborados());
 
-        BigDecimal valorPensionEmpleador = ibcPensionDiasTrabajados
+        BigDecimal valorPensionEmpleador = ibc.getIbcPension()
                 .multiply(porcentajePensionEmp)
                 .setScale(ESCALA, RoundingMode.HALF_UP);
 
         aportes.add(AportePatronalCalculado.builder()
                 .nombreConcepto("Pensión empleador")
-                .baseCalculo(ibcPensionDiasTrabajados)
+                .baseCalculo(ibc.getIbcPension())
                 .porcentaje(porcentajePensionEmp)
                 .valorResultado(valorPensionEmpleador)
                 .esAporteLicenciaNoRemunerada(false)
@@ -224,7 +219,7 @@ public class SeguridadSocialCalculator {
             baseArl = ctx.getParametrosPorNombre()
                     .get("SMMLV").valorParamGeneral();
         } else {
-            baseArl = calcularIbcProporcional(ibc.getIbcArl(), ctx.getDiasLaborados());
+            baseArl = ibc.getIbcArl();
         }
 
         BigDecimal valorArl = baseArl
@@ -249,7 +244,8 @@ public class SeguridadSocialCalculator {
             IBCCalculado ibc,
             String tipoCotizante,
             String subtipoCotizante,
-            boolean exoneradaParafiscales
+            boolean exoneradaParafiscales,
+            BigDecimal totalDevengadoSalarial
     ) {
         List<AportePatronalCalculado> aportes = new ArrayList<>();
 
@@ -268,8 +264,7 @@ public class SeguridadSocialCalculator {
         BigDecimal baseParafiscales = ibc.getIbcParafiscales();
 
         boolean exoneradoSenaIcbf = exoneradaParafiscales
-                && ctx.getEmpleado().salarioBascMensual()
-                .compareTo(smmlv.multiply(DIEZ_SMMLV)) < 0;
+                && totalDevengadoSalarial.compareTo(smmlv.multiply(DIEZ_SMMLV)) < 0;
 
         // Tipo 20 (estudiante Ley 789): exento de SENA e ICBF por ley
         boolean estudianteLey789 = "20".equals(tipoCotizante);

@@ -26,21 +26,17 @@ public class DeduccionesCalculator {
 
         // --- Salud empleado ---
         if (ibc.isCotizaSalud()) {
-            BigDecimal ibcSaludDiasTrabajados = calcularIbcProporcional(
-                    ibc.getIbcSalud(),
-                    ctx.getDiasLaborados()
-            );
 
             BigDecimal porcentajeSaludEmp = ctx.getParametrosPorNombre()
                     .get("SALUD_EMPLEADO").porcentajeParamGeneral();
 
-            BigDecimal valorSaludEmp = ibcSaludDiasTrabajados
+            BigDecimal valorSaludEmp = ibc.getIbcSalud()
                     .multiply(porcentajeSaludEmp)
                     .setScale(ESCALA, RoundingMode.HALF_UP);
 
             deducciones.add(DeduccionCalculada.builder()
                     .nombreConcepto("Salud empleado")
-                    .baseCalculo(ibcSaludDiasTrabajados)
+                    .baseCalculo(ibc.getIbcSalud())
                     .porcentaje(porcentajeSaludEmp)
                     .valorResultado(valorSaludEmp)
                     .esAporteLicenciaNoRemunerada(false)
@@ -49,21 +45,17 @@ public class DeduccionesCalculator {
 
         // --- Pensión empleado días trabajados ---
         if (ibc.isCotizaPension()) {
-            BigDecimal ibcPensionDiasTrabajados = calcularIbcProporcional(
-                    ibc.getIbcPension(),
-                    ctx.getDiasLaborados()
-            );
 
             BigDecimal porcentajePensionEmp = ctx.getParametrosPorNombre()
                     .get("PENSION_EMPLEADO").porcentajeParamGeneral();
 
-            BigDecimal valorPensionEmp = ibcPensionDiasTrabajados
+            BigDecimal valorPensionEmp = ibc.getIbcPension()
                     .multiply(porcentajePensionEmp)
                     .setScale(ESCALA, RoundingMode.HALF_UP);
 
             deducciones.add(DeduccionCalculada.builder()
                     .nombreConcepto("Pensión empleado")
-                    .baseCalculo(ibcPensionDiasTrabajados)
+                    .baseCalculo(ibc.getIbcPension())
                     .porcentaje(porcentajePensionEmp)
                     .valorResultado(valorPensionEmp)
                     .esAporteLicenciaNoRemunerada(false)
@@ -96,21 +88,18 @@ public class DeduccionesCalculator {
             }
         }
 
-        // --- Subtipo 6: FSP sobre IBC salud si IBC >= 4 SMMLV ---
-        if ("6".equals(subtipo)) {
+        // Subtipo 6: cotiza FSP sobre IBC salud SOLO si no cotiza pensión
+        // (evita duplicar la deducción cuando ibc.isCotizaPension() ya lo calculó)
+        if ("6".equals(subtipo) && !ibc.isCotizaPension()) {
             BigDecimal smmlv = ctx.getParametrosPorNombre()
                     .get("SMMLV").valorParamGeneral();
-
             BigDecimal cuatroSmmlv = smmlv.multiply(BigDecimal.valueOf(4));
-
             if (ibc.getIbcSalud().compareTo(cuatroSmmlv) >= 0) {
                 BigDecimal fspPorcentaje = calcularPorcentajeFsp(ctx, ibc.getIbcSalud());
-
                 if (fspPorcentaje.compareTo(BigDecimal.ZERO) > 0) {
                     BigDecimal valorFsp = ibc.getIbcSalud()
                             .multiply(fspPorcentaje)
                             .setScale(ESCALA, RoundingMode.HALF_UP);
-
                     deducciones.add(DeduccionCalculada.builder()
                             .nombreConcepto("Aporte fondo de solidaridad pensional empleado")
                             .baseCalculo(ibc.getIbcSalud())

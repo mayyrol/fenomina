@@ -64,6 +64,14 @@ public class DesprendibleController {
                 .map(cabecera -> {
                     EmpleadoDTO empleado = empleadosPorId.get(cabecera.getFkEmpleadoId());
 
+                    java.time.LocalDate fechaInicioProceso = proceso.getFechaInicioPeriodo();
+                    java.time.LocalDate fechaIngresoEmp = empleado != null
+                            ? empleado.fechaIngresoEmp() : null;
+                    java.time.LocalDate fechaInicioCorteEmpleado =
+                            (fechaIngresoEmp != null && fechaIngresoEmp.isAfter(fechaInicioProceso))
+                                    ? fechaIngresoEmp
+                                    : fechaInicioProceso;
+
                     List<ReporteNominaDetalle> detalles = reporteNominaDetalleRepository
                             .findByFkCabecNominaId(cabecera.getCabecNominaId());
 
@@ -79,6 +87,7 @@ public class DesprendibleController {
                             .salarioBasico(empleado != null
                                     ? empleado.salarioBascMensual() : null)
                             .anio(cabecera.getAnioCabecNomina())
+                            .fechaInicioCorteEmpleado(fechaInicioCorteEmpleado)
                             .periodo(cabecera.getPeriodoCotiNomina())
                             .totalDevengado(cabecera.getTotalDevengadoEmp())
                             .totalDeducciones(cabecera.getTotalDeduccionEmp())
@@ -87,6 +96,14 @@ public class DesprendibleController {
                                     .map(d -> {
                                         ConceptoNominaDTO concepto = conceptosPorId
                                                 .get(d.getFkConcepNominaId());
+                                        String unidadCantidad = null;
+                                        if (d.getCantidadConcept() != null && concepto != null) {
+                                            boolean esHoras = concepto.nombreConcepNomina() != null && (
+                                                    concepto.nombreConcepNomina().startsWith("Hora extra") ||
+                                                            concepto.nombreConcepNomina().startsWith("Recargo")
+                                            );
+                                            unidadCantidad = esHoras ? "horas" : "días";
+                                        }
                                         return DesprendibleResponseDTO.ConceptoDetalleDTO
                                                 .builder()
                                                 .concepNominaId(d.getFkConcepNominaId())
@@ -97,6 +114,7 @@ public class DesprendibleController {
                                                         ? concepto.categoriaConcNomina()
                                                         : "N/A")
                                                 .cantidad(d.getCantidadConcept())
+                                                .unidadCantidad(unidadCantidad)
                                                 .baseCalculo(d.getBaseCalculoConcept())
                                                 .valorResultado(d.getValorResultConcept())
                                                 .build();
@@ -242,7 +260,7 @@ public class DesprendibleController {
                     return detalles.stream()
                             .filter(d -> d.getFkConcepNominaId() == 1L)
                             .mapToInt(d -> d.getCantidadConcept() != null
-                                    ? d.getCantidadConcept() : 0)
+                                    ? d.getCantidadConcept().intValue() : 0)
                             .sum();
                 })
                 .sum();
@@ -270,7 +288,7 @@ public class DesprendibleController {
                                         "valorResultado", d.getValorResultConcept() != null
                                                 ? d.getValorResultConcept() : BigDecimal.ZERO,
                                         "cantidad", d.getCantidadConcept() != null
-                                                ? d.getCantidadConcept() : 0,
+                                                ? d.getCantidadConcept() : BigDecimal.ZERO,
                                         "periodo", cabecera.getPeriodoCotiNomina(),
                                         "anio", cabecera.getAnioCabecNomina()
                                 );

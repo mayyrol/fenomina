@@ -45,6 +45,8 @@ public record EmpleadoRequestDTO(
         @Digits(integer = 13, fraction = 2, message = "El salario tiene formato inválido")
         BigDecimal salarioBascMensual,
 
+        Boolean esSalarioIntegral,
+
         Boolean tieneAuxTransporte,
 
         @NotNull(message = "La clase de riesgo es obligatoria")

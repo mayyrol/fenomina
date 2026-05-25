@@ -34,8 +34,8 @@ public class ReporteNominaDetalle {
     @Column(name = "fk_contrato_concep_id")
     private Long fkContratoConceptId;
 
-    @Column(name = "cantidad_concept")
-    private Integer cantidadConcept;
+    @Column(name = "cantidad_concept", precision = 5, scale = 2)
+    private BigDecimal cantidadConcept;
 
     @Column(name = "base_calculo_concept", precision = 12, scale = 2)
     private BigDecimal baseCalculoConcept;

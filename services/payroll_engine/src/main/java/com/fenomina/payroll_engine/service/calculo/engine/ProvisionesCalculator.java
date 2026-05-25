@@ -130,7 +130,7 @@ public class ProvisionesCalculator {
     }
 
     // --- Helpers de filtrado ---
-
+/*
     private boolean esVacacionesCompensadas(String nombreConcepto) {
         return "Vacaciones compensadas en dinero".equals(nombreConcepto);
     }
@@ -142,4 +142,6 @@ public class ProvisionesCalculator {
             default -> false;
         };
     }
+
+ */
 }

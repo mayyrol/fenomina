@@ -4,6 +4,7 @@ import lombok.Builder;
 import lombok.Getter;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.List;
 
 @Getter
@@ -16,6 +17,7 @@ public class DesprendibleResponseDTO {
     private final String apellidosEmpleado;
     private final String documentoEmpleado;
     private final BigDecimal salarioBasico;
+    private final java.time.LocalDate fechaInicioCorteEmpleado;
     private final Integer anio;
     private final Integer periodo;
     private final BigDecimal totalDevengado;
@@ -29,7 +31,8 @@ public class DesprendibleResponseDTO {
         private final Long concepNominaId;
         private final String nombreConcepto;
         private final String categoria;
-        private final Integer cantidad;
+        private final BigDecimal cantidad;
+        private final String unidadCantidad;
         private final BigDecimal baseCalculo;
         private final BigDecimal valorResultado;
     }
