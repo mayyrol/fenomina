@@ -130,14 +130,17 @@ public class ReportePrestacionesService {
         // [16] valor_neto_presta
         // [17] valor_int_cesantias
         // [18] promedio_var_periodo
-        // [19] nombre_concep_nomina
-        // [20] concep_nomina_id
+        // [19] promedio_aux_transporte
+        // [20] nombre_concep_nomina
+        // [21] concep_nomina_id
+        // [22] estado_proc_nomina
         return ReportePrimaEmpresaDTO.builder()
                 .documentoEmp((String) row[0])
                 .nombresEmp((String) row[1])
                 .apellidosEmp((String) row[2])
-                .salarioBase(toBigDecimal(row[3]))
+                .salarioBase(toBigDecimal(row[14]))
                 .tieneAuxTransporte(toBoolean(row[4]))
+                .promedioAuxTransporte(toBigDecimal(row[19]))
                 .anioLiqui(toInteger(row[7]))
                 .periodoLiqui(toInteger(row[8]))
                 .finicioGeneral(toLocalDate(row[9]))
@@ -148,6 +151,7 @@ public class ReportePrestacionesService {
                 .baseLiquiTotal(toBigDecimal(row[15]))
                 .valorNetoPrima(toBigDecimal(row[16]))
                 .promedioVarPeriodo(toBigDecimal(row[18]))
+                .estadoProceso((String) row[22])
                 .build();
     }
 
@@ -164,6 +168,7 @@ public class ReportePrestacionesService {
                 .periodo(toInteger(row[1]))
                 .totalNetoPrimas(toBigDecimal(row[3]))
                 .totalEmpleados(toLong(row[5]))
+                .estadoProceso((String) row[6])
                 .build();
     }
 
@@ -172,9 +177,9 @@ public class ReportePrestacionesService {
                 .documentoEmp((String) row[0])
                 .nombresEmp((String) row[1])
                 .apellidosEmp((String) row[2])
-                .salarioBase(toBigDecimal(row[3]))
+                .salarioBase(toBigDecimal(row[3]))           // salario_basc_mensual del empleado
                 .tieneAuxTransporte(toBoolean(row[4]))
-                .fondoPensionEmp((String) row[5])
+                .fondoCesantiasEmp((String) row[5])
                 .fechaIngresoEmp(toLocalDate(row[6]))
                 .anioLiqui(toInteger(row[7]))
                 .periodoLiqui(toInteger(row[8]))
@@ -187,6 +192,8 @@ public class ReportePrestacionesService {
                 .baseLiquiTotal(toBigDecimal(row[15]))
                 .cesantias(toBigDecimal(row[16]))
                 .interesesCesantias(toBigDecimal(row[17]))
+                .promedioAuxTransporte(toBigDecimal(row[19]))
+                .estadoProceso((String) row[22])
                 .build();
     }
 
@@ -203,6 +210,7 @@ public class ReportePrestacionesService {
                 .totalCesantias(toBigDecimal(row[3]))
                 .totalInteresesCesantias(toBigDecimal(row[4]))
                 .totalEmpleados(toLong(row[5]))
+                .estadoProceso((String) row[6])
                 .build();
     }
 

@@ -21,4 +21,5 @@ public class DevengoCalculado {
     private final boolean esInformativo;
     private final Long novedadId;
     private final String textoInformativo;
+    private final String observacion;
 }

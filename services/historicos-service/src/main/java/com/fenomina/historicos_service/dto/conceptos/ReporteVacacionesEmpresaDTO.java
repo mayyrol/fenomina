@@ -17,6 +17,8 @@ public class ReporteVacacionesEmpresaDTO {
     private LocalDate fechaFinVac;
     private String tipoVacaciones;
     private Integer diasTomados;
-    private String estadoVacaciones;   // traído del tipo_vacacion en novedad
+    private String estadoVacaciones;
     private BigDecimal valorPagoVac;
+    private Integer anio;
+    private Integer periodo;
 }

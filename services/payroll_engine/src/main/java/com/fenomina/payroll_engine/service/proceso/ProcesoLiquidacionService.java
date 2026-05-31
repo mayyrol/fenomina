@@ -19,11 +19,7 @@ public interface ProcesoLiquidacionService {
             LocalDate fechaFin
     );
 
-    ProcesoLiquidacion cambiarEstado(
-            Long procesoId,
-            EstadoProceso nuevoEstado,
-            Long usuarioId
-    );
+    ResultadoCambioEstado cambiarEstado(Long procesoId, EstadoProceso nuevoEstado, Long usuarioId);
 
     ProcesoLiquidacion findById(Long procesoId);
 

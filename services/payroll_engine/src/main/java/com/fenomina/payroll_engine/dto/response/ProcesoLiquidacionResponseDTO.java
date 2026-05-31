@@ -3,6 +3,7 @@ package com.fenomina.payroll_engine.dto.response;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.List;
 
 public record ProcesoLiquidacionResponseDTO(
         Long procesoLiquiId,
@@ -17,5 +18,6 @@ public record ProcesoLiquidacionResponseDTO(
         LocalDateTime updatedAt,
         Integer cantidadEmpleados,
         BigDecimal totalNeto,
-        BigDecimal totalIntereses
+        BigDecimal totalIntereses,
+        List<String> advertencias
 ) {}

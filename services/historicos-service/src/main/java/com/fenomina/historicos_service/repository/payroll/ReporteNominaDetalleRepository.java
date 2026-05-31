@@ -27,13 +27,14 @@ public interface ReporteNominaDetalleRepository extends JpaRepository<ReporteNom
             nc.periodo_coti_nomina      AS periodo,
             nc.total_devengado_emp,
             nc.total_deduccion_emp,
-            nc.neto_nomina_emp
+            nc.neto_nomina_emp,
+            pl.estado_proc_nomina AS estado_proceso
         FROM payroll.nomina_cabecera nc
         JOIN master_data.empleado emp ON nc.fk_empleado_id = emp.empleado_id
         JOIN payroll.proceso_liquidacion pl ON nc.fk_proceso_liqui_id = pl.proceso_liqui_id
         WHERE pl.fk_id_empresa = :empresaId
           AND nc.deleted_at IS NULL
-          AND pl.estado_proc_nomina = 'PAGADO'
+          AND pl.estado_proc_nomina IN ('PENDIENTE_PAGO', 'PAGADO')
           AND emp.deleted_at IS NULL
           AND (:anio IS NULL OR nc.anio_cabec_nomina = :anio)
           AND (:periodo IS NULL OR nc.periodo_coti_nomina = :periodo)
@@ -50,7 +51,7 @@ public interface ReporteNominaDetalleRepository extends JpaRepository<ReporteNom
         WHERE pl.fk_id_empresa = :empresaId
           AND nc.deleted_at IS NULL
           AND emp.deleted_at IS NULL
-          AND pl.estado_proc_nomina = 'PAGADO'
+          AND pl.estado_proc_nomina IN ('PENDIENTE_PAGO', 'PAGADO')
         """,
             nativeQuery = true)
     Page<Object[]> findReporteNominaEmpleados(
@@ -78,7 +79,7 @@ public interface ReporteNominaDetalleRepository extends JpaRepository<ReporteNom
     WHERE pl.fk_id_empresa = :empresaId
       AND rnd.fk_concep_nomina_id IN (:conceptoIds)
       AND nc.deleted_at IS NULL
-      AND pl.estado_proc_nomina = 'PAGADO'
+      AND pl.estado_proc_nomina IN ('PENDIENTE_PAGO', 'PAGADO')
       AND emp.deleted_at IS NULL
       AND (:anio IS NULL OR pl.anio = :anio)
       AND (:periodo IS NULL OR pl.periodo = :periodo)
@@ -114,7 +115,7 @@ public interface ReporteNominaDetalleRepository extends JpaRepository<ReporteNom
       AND rnd.fk_concep_nomina_id IN (:conceptoIds)
       AND nc.deleted_at IS NULL
       AND emp.deleted_at IS NULL
-      AND pl.estado_proc_nomina = 'PAGADO'    
+      AND pl.estado_proc_nomina IN ('PENDIENTE_PAGO', 'PAGADO')   
       AND (:anio IS NULL OR pl.anio = :anio)
       AND (:periodo IS NULL OR pl.periodo = :periodo)
       AND (:documento IS NULL OR emp.documento_emp
@@ -124,17 +125,19 @@ public interface ReporteNominaDetalleRepository extends JpaRepository<ReporteNom
     ORDER BY emp.apellidos_emp ASC, pl.anio DESC, pl.periodo DESC
     """,
             countQuery = """
-    SELECT COUNT(rnd.nomina_detalle_id)
-    FROM payroll.reporte_nomina_detalle rnd
-    JOIN payroll.nomina_cabecera nc
-        ON rnd.fk_cabec_nomina_id = nc.cabec_nomina_id
-    JOIN payroll.proceso_liquidacion pl
-        ON nc.fk_proceso_liqui_id = pl.proceso_liqui_id
-    JOIN master_data.empleado emp
-        ON nc.fk_empleado_id = emp.empleado_id
-    WHERE pl.fk_id_empresa = :empresaId
-      AND rnd.fk_concep_nomina_id IN (:conceptoIds)
-      AND nc.deleted_at IS NULL AND emp.deleted_at IS NULL
+                    SELECT COUNT(DISTINCT CONCAT(emp.documento_emp, '-', pl.anio, '-', pl.periodo))
+                    FROM payroll.reporte_nomina_detalle rnd
+                    JOIN payroll.nomina_cabecera nc
+                        ON rnd.fk_cabec_nomina_id = nc.cabec_nomina_id
+                    JOIN payroll.proceso_liquidacion pl
+                        ON nc.fk_proceso_liqui_id = pl.proceso_liqui_id
+                    JOIN master_data.empleado emp
+                        ON nc.fk_empleado_id = emp.empleado_id
+                    WHERE pl.fk_id_empresa = :empresaId
+                      AND rnd.fk_concep_nomina_id IN (:conceptoIds)
+                      AND nc.deleted_at IS NULL
+                      AND emp.deleted_at IS NULL
+                      AND pl.estado_proc_nomina IN ('PENDIENTE_PAGO', 'PAGADO')
     """,
             nativeQuery = true)
     Page<Object[]> findDetallesPorConceptoIdsYEmpleado(
@@ -173,7 +176,7 @@ public interface ReporteNominaDetalleRepository extends JpaRepository<ReporteNom
     WHERE pl.fk_id_empresa = :empresaId
       AND rnd.fk_concep_nomina_id IN (:conceptoIds)
       AND nc.deleted_at IS NULL
-      AND pl.estado_proc_nomina = 'PAGADO'    
+      AND pl.estado_proc_nomina IN ('PENDIENTE_PAGO', 'PAGADO')    
       AND emp.deleted_at IS NULL     
       AND (:anio IS NULL OR pl.anio = :anio)
       AND (:periodo IS NULL OR pl.periodo = :periodo)
@@ -184,17 +187,19 @@ public interface ReporteNominaDetalleRepository extends JpaRepository<ReporteNom
     ORDER BY emp.apellidos_emp ASC, pl.anio DESC, pl.periodo DESC
     """,
             countQuery = """
-    SELECT COUNT(rnd.nomina_detalle_id)
-    FROM payroll.reporte_nomina_detalle rnd
-    JOIN payroll.nomina_cabecera nc
-        ON rnd.fk_cabec_nomina_id = nc.cabec_nomina_id
-    JOIN payroll.proceso_liquidacion pl
-        ON nc.fk_proceso_liqui_id = pl.proceso_liqui_id
-    JOIN master_data.empleado emp
-        ON nc.fk_empleado_id = emp.empleado_id
-    WHERE pl.fk_id_empresa = :empresaId
-      AND rnd.fk_concep_nomina_id IN (:conceptoIds)
-      AND nc.deleted_at IS NULL AND emp.deleted_at IS NULL
+                    SELECT COUNT(DISTINCT CONCAT(emp.documento_emp, '-', pl.anio, '-', pl.periodo))
+                    FROM payroll.reporte_nomina_detalle rnd
+                    JOIN payroll.nomina_cabecera nc
+                        ON rnd.fk_cabec_nomina_id = nc.cabec_nomina_id
+                    JOIN payroll.proceso_liquidacion pl
+                        ON nc.fk_proceso_liqui_id = pl.proceso_liqui_id
+                    JOIN master_data.empleado emp
+                        ON nc.fk_empleado_id = emp.empleado_id
+                    WHERE pl.fk_id_empresa = :empresaId
+                      AND rnd.fk_concep_nomina_id IN (:conceptoIds)
+                      AND nc.deleted_at IS NULL
+                      AND emp.deleted_at IS NULL
+                      AND pl.estado_proc_nomina IN ('PENDIENTE_PAGO', 'PAGADO')
     """,
             nativeQuery = true)
     Page<Object[]> findDetalleConceptosVariosPorEmpleado(
@@ -226,7 +231,7 @@ public interface ReporteNominaDetalleRepository extends JpaRepository<ReporteNom
     WHERE pl.fk_id_empresa = :empresaId
       AND rnd.fk_concep_nomina_id = :conceptoId
       AND nc.deleted_at IS NULL
-      AND pl.estado_proc_nomina = 'PAGADO'    
+      AND pl.estado_proc_nomina IN ('PENDIENTE_PAGO', 'PAGADO')  
       AND emp.deleted_at IS NULL
       AND (:anio IS NULL OR pl.anio = :anio)
       AND (:periodo IS NULL OR pl.periodo = :periodo)
@@ -250,6 +255,7 @@ public interface ReporteNominaDetalleRepository extends JpaRepository<ReporteNom
     WHERE pl.fk_id_empresa = :empresaId
       AND rnd.fk_concep_nomina_id = :conceptoId
       AND nc.deleted_at IS NULL AND emp.deleted_at IS NULL
+       AND pl.estado_proc_nomina IN ('PENDIENTE_PAGO', 'PAGADO')
     """,
             nativeQuery = true)
     Page<Object[]> findRetefuentePorEmpleado(
@@ -260,6 +266,47 @@ public interface ReporteNominaDetalleRepository extends JpaRepository<ReporteNom
             @Param("documento") String documento,
             @Param("nombres") String nombres,
             Pageable pageable
+    );
+
+    // Sin paginación para seguridad social y parafiscales x empleado
+    @Query(value = """
+    SELECT
+        pl.anio,
+        pl.periodo,
+        emp.documento_emp,
+        emp.nombres_emp,
+        emp.apellidos_emp,
+        emp.fecha_ingreso_emp,
+        rnd.fk_concep_nomina_id,
+        rnd.valor_result_concept
+    FROM payroll.reporte_nomina_detalle rnd
+    JOIN payroll.nomina_cabecera nc
+        ON rnd.fk_cabec_nomina_id = nc.cabec_nomina_id
+    JOIN payroll.proceso_liquidacion pl
+        ON nc.fk_proceso_liqui_id = pl.proceso_liqui_id
+    JOIN master_data.empleado emp
+        ON nc.fk_empleado_id = emp.empleado_id
+    WHERE pl.fk_id_empresa = :empresaId
+      AND rnd.fk_concep_nomina_id IN (:conceptoIds)
+      AND nc.deleted_at IS NULL
+      AND emp.deleted_at IS NULL
+      AND pl.estado_proc_nomina IN ('PENDIENTE_PAGO', 'PAGADO')
+      AND (:anio IS NULL OR pl.anio = :anio)
+      AND (:periodo IS NULL OR pl.periodo = :periodo)
+      AND (:documento IS NULL OR emp.documento_emp
+           LIKE CONCAT('%', CAST(:documento AS TEXT), '%'))
+      AND (:nombres IS NULL OR LOWER(CONCAT(emp.nombres_emp, ' ', emp.apellidos_emp))
+           LIKE LOWER(CONCAT('%', CAST(:nombres AS TEXT), '%')))
+    ORDER BY emp.apellidos_emp ASC, pl.anio DESC, pl.periodo DESC
+    """,
+            nativeQuery = true)
+    List<Object[]> findDetallesPorConceptoIdsYEmpleadoSinPaginar(
+            @Param("empresaId") Long empresaId,
+            @Param("conceptoIds") List<Long> conceptoIds,
+            @Param("anio") Integer anio,
+            @Param("periodo") Integer periodo,
+            @Param("documento") String documento,
+            @Param("nombres") String nombres
     );
 
 }

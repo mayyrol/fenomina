@@ -16,7 +16,7 @@ public class DesprendiblePrestacionResponseDTO {
     private final String nombresEmpleado;
     private final String apellidosEmpleado;
     private final String documentoEmpleado;
-    private final String fondoPension;
+    private final String fondoCesantias;
     private final Integer anio;
     private final Integer periodo;
     private final LocalDate fechaInicioCorte;
@@ -28,4 +28,6 @@ public class DesprendiblePrestacionResponseDTO {
     private final BigDecimal valorPrestacion;
     private final BigDecimal valorInteresesCesantias;
     private final String tipoPrestacion;
+    private final BigDecimal promedioAuxTransporte;
+    private final String cargoEmpleado;
 }

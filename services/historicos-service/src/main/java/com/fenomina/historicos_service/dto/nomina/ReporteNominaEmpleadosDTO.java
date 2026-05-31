@@ -18,4 +18,5 @@ public class ReporteNominaEmpleadosDTO {
     private BigDecimal totalDevengado;
     private BigDecimal totalDeducciones;
     private BigDecimal netoNomina;
+    private String estadoProceso;
 }

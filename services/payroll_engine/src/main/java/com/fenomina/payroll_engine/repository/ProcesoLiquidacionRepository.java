@@ -52,4 +52,15 @@ public interface ProcesoLiquidacionRepository extends JpaRepository<ProcesoLiqui
             @Param("tipoProceso") TipoProceso tipoProceso,
             @Param("anio") Integer anio
     );
+
+    @Query("SELECT p FROM ProcesoLiquidacion p " +
+            "WHERE p.fkIdEmpresa = :empresaId " +
+            "AND p.tipoProceso = :tipoProceso " +
+            "AND p.anio IN :anios " +
+            "AND p.estadoProcNomina != 'ANULADO'")
+    List<ProcesoLiquidacion> findByEmpresaAndTipoAndAnios(
+            @Param("empresaId") Long empresaId,
+            @Param("tipoProceso") TipoProceso tipoProceso,
+            @Param("anios") List<Integer> anios
+    );
 }

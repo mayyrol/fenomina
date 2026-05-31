@@ -18,6 +18,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.util.ArrayList;
 import java.util.Map;
 
 import java.math.BigDecimal;
@@ -49,6 +51,7 @@ public class ProcesoLiquidacionServiceImpl implements ProcesoLiquidacionService 
 
     private final CabeceraLiquiPrestacionRepository cabeceraLiquiPrestacionRepository;
     private final DetalleLiquiPrestacionRepository detalleLiquiPrestacionRepository;
+
 
     @Override
     @Transactional
@@ -106,11 +109,10 @@ public class ProcesoLiquidacionServiceImpl implements ProcesoLiquidacionService 
 
     @Override
     @Transactional
-    public ProcesoLiquidacion cambiarEstado(Long procesoId, EstadoProceso nuevoEstado, Long usuarioId) {
-        log.info("Cambiando estado proceso {} a {}", procesoId, nuevoEstado);
+    public ResultadoCambioEstado cambiarEstado(
+            Long procesoId, EstadoProceso nuevoEstado, Long usuarioId) {
 
         ProcesoLiquidacion proceso = findById(procesoId);
-
         estadoValidator.validarTransicion(proceso.getEstadoProcNomina(), nuevoEstado);
 
         if (nuevoEstado == EstadoProceso.ANULADO &&
@@ -136,8 +138,9 @@ public class ProcesoLiquidacionServiceImpl implements ProcesoLiquidacionService 
                     });
         }
 
+        List<String> advertencias = new ArrayList<>();
         if (nuevoEstado == EstadoProceso.CERRADO) {
-            validarCierre(proceso);
+            advertencias = validarCierre(proceso);
         }
 
         proceso.setEstadoProcNomina(nuevoEstado);
@@ -151,7 +154,7 @@ public class ProcesoLiquidacionServiceImpl implements ProcesoLiquidacionService 
                     });
         }
 
-        return procesoRepository.save(proceso);
+        return new ResultadoCambioEstado(procesoRepository.save(proceso), advertencias);
     }
 
     @Override
@@ -227,7 +230,9 @@ public class ProcesoLiquidacionServiceImpl implements ProcesoLiquidacionService 
 
     // --- Validaciones internas ---
 
-    private void validarCierre(ProcesoLiquidacion proceso) {
+    private List<String> validarCierre(ProcesoLiquidacion proceso) {
+        List<String> advertencias = new ArrayList<>();
+
         List<EmpleadoDTO> empleados = masterDataClient
                 .findEmpleadosActivos(proceso.getFkIdEmpresa());
 
@@ -252,11 +257,17 @@ public class ProcesoLiquidacionServiceImpl implements ProcesoLiquidacionService 
                     .filter(n -> n.getFkEmpleadoId().equals(empleado.empleadoId()))
                     .toList();
 
-            validarLimiteNoSalarial(empleado, novedadesEmpleado, conceptosPorId);
+            String advertencia = verificarExcesoNoSalarial(
+                    empleado, novedadesEmpleado, conceptosPorId);
+            if (advertencia != null) {
+                advertencias.add(advertencia);
+            }
         }
+
+        return advertencias;
     }
 
-    private void validarLimiteNoSalarial(
+    private String verificarExcesoNoSalarial(
             EmpleadoDTO empleado,
             List<Novedad> novedades,
             Map<Long, ConceptoNominaDTO> conceptosPorId
@@ -268,7 +279,10 @@ public class ProcesoLiquidacionServiceImpl implements ProcesoLiquidacionService 
                 .filter(n -> n.getValorRefNovedad() != null)
                 .filter(n -> {
                     ConceptoNominaDTO concepto = conceptosPorId.get(n.getFkConcepNominaId());
-                    return concepto != null && Boolean.FALSE.equals(concepto.esSalario());
+                    return concepto != null
+                            && Boolean.FALSE.equals(concepto.esSalario())
+                            && !"Bonificaciones ocasionales o por mera liberalidad"
+                            .equals(concepto.nombreConcepNomina());
                 })
                 .map(Novedad::getValorRefNovedad)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
@@ -279,12 +293,19 @@ public class ProcesoLiquidacionServiceImpl implements ProcesoLiquidacionService 
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
         BigDecimal totalNoSalarial = totalNoSalarialNovedades.add(totalNoSalarialFijos);
+        BigDecimal exceso = novedadValidator.calcularExcesoNoSalarial(
+                totalNoSalarial, empleado.salarioBascMensual());
 
-        novedadValidator.validarLimiteNoSalarial(
-                totalNoSalarial,
-                empleado.salarioBascMensual(),
-                empleado.nombresEmp(),
-                empleado.apellidosEmp()
-        );
+        if (exceso.compareTo(BigDecimal.ZERO) > 0) {
+            return String.format(
+                    "Empleado %s %s: los pagos no salariales ($%s) superan el límite del 40%%. " +
+                            "El exceso de $%s se incorporará automáticamente al IBC.",
+                    empleado.nombresEmp(),
+                    empleado.apellidosEmp(),
+                    totalNoSalarial.setScale(0, java.math.RoundingMode.HALF_UP),
+                    exceso.setScale(0, java.math.RoundingMode.HALF_UP)
+            );
+        }
+        return null;
     }
 }

@@ -24,6 +24,8 @@ public class DesprendibleResponseDTO {
     private final BigDecimal totalDeducciones;
     private final BigDecimal netoAPagar;
     private final List<ConceptoDetalleDTO> conceptos;
+    private final String advertenciaNoSalarial;
+    private final String observacion;
 
     @Getter
     @Builder
@@ -35,5 +37,6 @@ public class DesprendibleResponseDTO {
         private final String unidadCantidad;
         private final BigDecimal baseCalculo;
         private final BigDecimal valorResultado;
+        private final String observacion;
     }
 }

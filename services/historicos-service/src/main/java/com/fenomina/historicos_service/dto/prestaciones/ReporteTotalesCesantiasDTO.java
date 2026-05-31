@@ -14,4 +14,5 @@ public class ReporteTotalesCesantiasDTO {
     private BigDecimal totalCesantias;
     private BigDecimal totalInteresesCesantias;
     private Long totalEmpleados;
+    private String estadoProceso;
 }

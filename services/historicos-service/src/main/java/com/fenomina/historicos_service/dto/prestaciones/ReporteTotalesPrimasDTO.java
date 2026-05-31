@@ -13,4 +13,5 @@ public class ReporteTotalesPrimasDTO {
     private Integer periodo;           // semestre
     private BigDecimal totalNetoPrimas;
     private Long totalEmpleados;
+    private String estadoProceso;
 }

@@ -19,4 +19,5 @@ public class ReporteNominaTotalEmpresaDTO {
     private BigDecimal totalDeducciones;
     private BigDecimal totalCostoEmpresa;
     private Long totalEmpleados;
+    private String estadoProceso;
 }

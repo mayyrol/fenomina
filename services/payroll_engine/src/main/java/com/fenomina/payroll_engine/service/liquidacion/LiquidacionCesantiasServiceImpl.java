@@ -156,24 +156,20 @@ public class LiquidacionCesantiasServiceImpl implements LiquidacionCesantiasServ
         // --- Base de liquidación ---
         // Si salario no varió en últimos 3 meses: último salario mensual devengado
         // Si varió o es variable: promedio del último año
-        BigDecimal salarioBase = calcularSalarioBaseCesantias(
-                nominasAnio, empleado, conceptosPorNombre);
+        BigDecimal[] resultado = calcularBaseYAux(nominasAnio, empleado);
+        BigDecimal baseLiquidacion = resultado[0];
+        BigDecimal auxPromedio = resultado[1];
+        BigDecimal salarioPromedio = baseLiquidacion.subtract(auxPromedio);
 
-        BigDecimal auxTransporteEmpleado = Boolean.TRUE.equals(empleado.tieneAuxTransporte())
-                ? auxTransporte : BigDecimal.ZERO;
-
-        // --- Fórmula cesantías: salarioBase * diasLiquidados / 360 ---
-        BigDecimal baseLiquidacion = salarioBase.add(auxTransporteEmpleado);
+// Fórmula cesantías: base × días / 360
         BigDecimal valorCesantias = baseLiquidacion
                 .multiply(BigDecimal.valueOf(diasLiquidados))
                 .divide(BigDecimal.valueOf(DIAS_ANIO), ESCALA, RoundingMode.HALF_UP);
 
-        // Fórmula: cesantías acumuladas × 0.12 (tasa anual directa sobre el saldo)
-        // Equivalente a (cesantías × días × 0.12) / 360 donde cesantías = base×días/360
-        // pero el saldo ya contiene los días, así que solo se aplica la tasa
         BigDecimal valorIntereses = valorCesantias
+                .multiply(BigDecimal.valueOf(diasLiquidados))
                 .multiply(new BigDecimal("0.12"))
-                .setScale(ESCALA, RoundingMode.HALF_UP);
+                .divide(BigDecimal.valueOf(DIAS_ANIO), ESCALA, RoundingMode.HALF_UP);
 
         // --- Persistir detalle cesantías ---
         ConceptoNominaDTO conceptoCesantias = conceptosPorNombre.get("Cesantías");
@@ -188,7 +184,8 @@ public class LiquidacionCesantiasServiceImpl implements LiquidacionCesantiasServ
                 .fechaInicioCorteEmp(fechaInicioReal)
                 .fechaFinCorteEmp(fechaFinPeriodo)
                 .diasLiquidadosInt(diasLiquidados)
-                .salarioFijoMomento(salarioBase)
+                .salarioFijoMomento(salarioPromedio)
+                .promedioAuxTransporte(auxPromedio)
                 .baseLiquiTotal(baseLiquidacion)
                 .valorNetaPresta(valorCesantias)
                 .valorIntCesantias(valorIntereses)
@@ -202,50 +199,56 @@ public class LiquidacionCesantiasServiceImpl implements LiquidacionCesantiasServ
 
     // --- Cálculo de salario base cesantías ---
 
-    private BigDecimal calcularSalarioBaseCesantias(
+    private BigDecimal[] calcularBaseYAux(
             List<NominaCabecera> nominasAnio,
-            EmpleadoDTO empleado,
-            Map<String, ConceptoNominaDTO> conceptosPorNombre
+            EmpleadoDTO empleado
     ) {
         if (nominasAnio.isEmpty()) {
-            return empleado.salarioBascMensual();
+            return new BigDecimal[]{
+                    empleado.salarioBascMensual(),
+                    BigDecimal.ZERO
+            };
         }
 
-        List<Long> conceptosSalarialesIds = conceptosPorNombre.values().stream()
-                .filter(c -> Boolean.TRUE.equals(c.esSalario())
-                        || "Auxilio de transporte".equals(c.nombreConcepNomina()))
-                .filter(c -> !"Vacaciones compensadas en dinero"
-                        .equals(c.nombreConcepNomina()))
-                .map(ConceptoNominaDTO::concepNominaId)
-                .collect(Collectors.toList());
+        Map<Integer, BigDecimal> devengadoPorMes = new java.util.LinkedHashMap<>();
+        Map<Integer, BigDecimal> auxPorMes = new java.util.LinkedHashMap<>();
 
-        List<BigDecimal> devengadosPorPeriodo = nominasAnio.stream()
-                .map(nc -> {
-                    List<com.fenomina.payroll_engine.entity.ReporteNominaDetalle> detalles =
-                            reporteNominaDetalleRepository
-                                    .findByFkCabecNominaId(nc.getCabecNominaId());
+        for (NominaCabecera nc : nominasAnio) {
+            int mes = nc.getPeriodoCotiNomina();
 
-                    return detalles.stream()
-                            .filter(d -> conceptosSalarialesIds
-                                    .contains(d.getFkConcepNominaId()))
-                            .map(d -> d.getValorResultConcept() != null
-                                    ? d.getValorResultConcept()
-                                    : BigDecimal.ZERO)
-                            .reduce(BigDecimal.ZERO, BigDecimal::add);
-                })
-                .filter(v -> v.compareTo(BigDecimal.ZERO) > 0)
-                .collect(Collectors.toList());
+            devengadoPorMes.merge(mes,
+                    nc.getTotalDevengadoEmp() != null
+                            ? nc.getTotalDevengadoEmp() : BigDecimal.ZERO,
+                    BigDecimal::add);
 
-        if (devengadosPorPeriodo.isEmpty()) {
-            return empleado.salarioBascMensual();
+            BigDecimal auxMes = reporteNominaDetalleRepository
+                    .findByFkCabecNominaId(nc.getCabecNominaId())
+                    .stream()
+                    .filter(d -> d.getFkConcepNominaId() != null
+                            && d.getFkConcepNominaId().equals(22L))
+                    .map(d -> d.getValorResultConcept() != null
+                            ? d.getValorResultConcept() : BigDecimal.ZERO)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+            auxPorMes.merge(mes, auxMes, BigDecimal::add);
         }
 
-        BigDecimal sumaDevengados = devengadosPorPeriodo.stream()
+        int mesesConNomina = devengadoPorMes.size();
+        if (mesesConNomina == 0) {
+            return new BigDecimal[]{empleado.salarioBascMensual(), BigDecimal.ZERO};
+        }
+
+        BigDecimal sumaDevengados = devengadoPorMes.values().stream()
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal sumaAux = auxPorMes.values().stream()
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
-        return sumaDevengados
-                .divide(BigDecimal.valueOf(devengadosPorPeriodo.size()),
-                        ESCALA, RoundingMode.HALF_UP);
+        BigDecimal divisor = BigDecimal.valueOf(mesesConNomina);
+
+        return new BigDecimal[]{
+                sumaDevengados.divide(divisor, ESCALA, RoundingMode.HALF_UP),
+                sumaAux.divide(divisor, ESCALA, RoundingMode.HALF_UP)
+        };
     }
 
     // --- Helpers ---

@@ -1,18 +1,32 @@
 package com.fenomina.payroll_engine.service.calculo.engine;
 
+import com.fenomina.payroll_engine.client.dto.ConceptoNominaDTO;
+import com.fenomina.payroll_engine.client.dto.ContratoConceptoDTO;
 import com.fenomina.payroll_engine.domain.vo.ContextoLiquidacion;
 import com.fenomina.payroll_engine.domain.vo.IBCCalculado;
+import com.fenomina.payroll_engine.entity.Novedad;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.util.List;
 
+@Slf4j
 @Component
 public class IBCCalculator {
 
     private static final BigDecimal FACTOR_IBC_INTEGRAL = new BigDecimal("0.70");
     private static final BigDecimal FACTOR_IBC_INDEPENDIENTE = new BigDecimal("0.40");
     private static final int ESCALA = 2;
+    private static final List<String> CONCEPTOS_EXCLUIDOS_TOPE_40 = List.of(
+            "Auxilio de transporte",
+            "Vacaciones compensadas en dinero",
+            "Bonificaciones ocasionales o por mera liberalidad",
+            "Cesantías",
+            "Prima de servicios",
+            "Intereses sobre las cesantías"
+    );
 
     public IBCCalculado calcular(ContextoLiquidacion ctx,
                                  BigDecimal totalDevengadoSalarial) {
@@ -59,6 +73,15 @@ public class IBCCalculator {
                     .setScale(ESCALA, RoundingMode.HALF_UP);
         } else {
             ibc = totalDevengadoSalarial.setScale(ESCALA, RoundingMode.HALF_UP);
+        }
+
+        if (!Boolean.TRUE.equals(ctx.getEmpleado().esSalarioIntegral())) {
+            BigDecimal excesoNoSalarial = calcularExcesoNoSalarial(ctx);
+            if (excesoNoSalarial.compareTo(BigDecimal.ZERO) > 0) {
+                ibc = ibc.add(excesoNoSalarial);
+                log.debug("IBC ajustado por exceso no salarial: +{} → IBC = {}",
+                        excesoNoSalarial, ibc);
+            }
         }
 
         ibc = aplicarTopes(ibc, smmlv, topeIbc, ctx.getDiasLaboradosBrutos());
@@ -263,5 +286,68 @@ public class IBCCalculator {
     private boolean cotizaSalud(String subtipoCotizante) {
         if (subtipoCotizante == null) return true;
         return !"9".equals(subtipoCotizante);
+    }
+
+    private BigDecimal calcularExcesoNoSalarial(ContextoLiquidacion ctx) {
+        BigDecimal totalSalarialFijos = ctx.getConceptosFijos().stream()
+                .filter(c -> Boolean.TRUE.equals(c.esSalario()) && c.valorFijo() != null)
+                .filter(c -> !CONCEPTOS_EXCLUIDOS_TOPE_40.contains(c.nombreConcepto()))
+                .filter(c -> !"Salario días trabajados".equals(c.nombreConcepto()))
+                .map(ContratoConceptoDTO::valorFijo)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        BigDecimal totalSalarialNovedades = ctx.getNovedades().stream()
+                .filter(n -> n.getValorRefNovedad() != null)
+                .filter(n -> {
+                    ConceptoNominaDTO concepto = ctx.getConceptosPorId()
+                            .get(n.getFkConcepNominaId());
+                    return concepto != null
+                            && Boolean.TRUE.equals(concepto.esSalario())
+                            && !CONCEPTOS_EXCLUIDOS_TOPE_40
+                            .contains(concepto.nombreConcepNomina());
+                })
+                .map(Novedad::getValorRefNovedad)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        BigDecimal salarioBasico = ctx.getEmpleado().salarioBascMensual();
+
+        BigDecimal totalSalarial = salarioBasico
+                .add(totalSalarialFijos)
+                .add(totalSalarialNovedades);
+
+        BigDecimal totalNoSalarialFijos = ctx.getConceptosFijos().stream()
+                .filter(c -> Boolean.FALSE.equals(c.esSalario()) && c.valorFijo() != null)
+                .filter(c -> !CONCEPTOS_EXCLUIDOS_TOPE_40.contains(c.nombreConcepto()))
+                .map(ContratoConceptoDTO::valorFijo)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        BigDecimal totalNoSalarialNovedades = ctx.getNovedades().stream()
+                .filter(n -> n.getValorRefNovedad() != null)
+                .filter(n -> {
+                    ConceptoNominaDTO concepto = ctx.getConceptosPorId()
+                            .get(n.getFkConcepNominaId());
+                    return concepto != null
+                            && Boolean.FALSE.equals(concepto.esSalario())
+                            && !CONCEPTOS_EXCLUIDOS_TOPE_40
+                            .contains(concepto.nombreConcepNomina())
+                            && !"Salario días trabajados".equals(concepto.nombreConcepNomina());
+                })
+                .map(Novedad::getValorRefNovedad)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        BigDecimal totalNoSalarial = totalNoSalarialFijos.add(totalNoSalarialNovedades);
+
+        if (totalSalarial.compareTo(BigDecimal.ZERO) <= 0
+                || totalNoSalarial.compareTo(BigDecimal.ZERO) <= 0) {
+            return BigDecimal.ZERO;
+        }
+
+        BigDecimal totalRemuneracion = totalSalarial.add(totalNoSalarial);
+        BigDecimal limite = totalRemuneracion
+                .multiply(new BigDecimal("0.40"))
+                .setScale(ESCALA, RoundingMode.HALF_UP);
+
+        BigDecimal exceso = totalNoSalarial.subtract(limite);
+        return exceso.compareTo(BigDecimal.ZERO) > 0 ? exceso : BigDecimal.ZERO;
     }
 }

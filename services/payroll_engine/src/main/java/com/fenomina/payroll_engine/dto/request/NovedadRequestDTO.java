@@ -17,5 +17,6 @@ public record NovedadRequestDTO(
         Integer cantidadDiasNovedad,
         BigDecimal cantidadHorasNovedad,
         BigDecimal valorRefNovedad,
-        String observaciones
+        String observaciones,
+        String tipoVacacion
 ) {}

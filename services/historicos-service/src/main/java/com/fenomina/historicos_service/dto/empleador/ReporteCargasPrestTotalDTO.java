@@ -13,6 +13,5 @@ public class ReporteCargasPrestTotalDTO {
     private Integer periodo;
     private BigDecimal cargPresCesantiasInformativo;
     private BigDecimal cargPresPrimas;
-    private BigDecimal cargPresVacaciones;
     private BigDecimal cargPresIntCesantias;
 }

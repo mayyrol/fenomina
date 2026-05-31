@@ -178,7 +178,7 @@ public class ReporteNominaService {
         log.debug("V21 - Estados nóminas empresa={}, estado={}", empresaId, estado);
 
         return nominaCabeceraRepository
-                .findByEmpresaYFiltros(empresaId, anio, periodo, estado, pageable)
+                .findByEmpresaYFiltros(empresaId, anio, periodo, pageable)
                 .map(nc -> mapEstadoNomina(nc, estado));
     }
 
@@ -194,7 +194,7 @@ public class ReporteNominaService {
         log.debug("V22 - Nóminas borrador/pagado empresa={}", empresaId);
 
         Page<NominaCabecera> borrador = nominaCabeceraRepository
-                .findByEmpresaYFiltros(empresaId, anio, periodo, "BORRADOR", pageable);
+                .findByEmpresaYFiltros(empresaId, anio, periodo, pageable);
 
         return borrador.map(nc -> mapEstadoNomina(nc, "BORRADOR"));
     }
@@ -234,6 +234,7 @@ public class ReporteNominaService {
         // [6] total_devengado_emp
         // [7] total_deduccion_emp
         // [8] neto_nomina_emp
+        // La posición [9] es estado_proceso
         return ReporteNominaEmpleadosDTO.builder()
                 .documentoEmp((String) row[0])
                 .nombresEmp((String) row[1])
@@ -244,6 +245,7 @@ public class ReporteNominaService {
                 .totalDevengado(toBigDecimal(row[6]))
                 .totalDeducciones(toBigDecimal(row[7]))
                 .netoNomina(toBigDecimal(row[8]))
+                .estadoProceso((String) row[9])
                 .build();
     }
 
@@ -258,6 +260,7 @@ public class ReporteNominaService {
         // [6] total_deducciones
         // [7] total_costo_empresa
         // [8] total_empleados
+        // La posición [9] es estado_proceso
         return ReporteNominaTotalEmpresaDTO.builder()
                 .anio(toInteger(row[0]))
                 .periodo(toInteger(row[1]))
@@ -268,6 +271,7 @@ public class ReporteNominaService {
                 .totalDeducciones(toBigDecimal(row[6]))
                 .totalCostoEmpresa(toBigDecimal(row[7]))
                 .totalEmpleados(toLong(row[8]))
+                .estadoProceso((String) row[9])
                 .build();
     }
 

@@ -43,6 +43,7 @@ public class CalculoNominaEngine {
     private final NominaCabeceraRepository nominaCabeceraRepository;
     private final ReporteNominaDetalleRepository reporteNominaDetalleRepository;
     private final NovedadRepository novedadRepository;
+    
 
     @Transactional
     public void liquidar(
@@ -338,6 +339,7 @@ public class CalculoNominaEngine {
                             .cantidadConcept(cantidad)
                             .baseCalculoConcept(d.getBaseCalculo())
                             .valorResultConcept(d.getValorResultado())
+                            .observacionConcept(d.getObservacion())
                             .build();
                 })
                 .collect(Collectors.toList());
@@ -356,9 +358,10 @@ public class CalculoNominaEngine {
                             .fkCabecNominaId(cabecNominaId)
                             .fkConcepNominaId(concepto != null ? concepto.concepNominaId() : null)
                             .fkNovedadId(d.getNovedadId())
-                            .cantidadConcept(null)
+                            .cantidadConcept(d.getCantidad())
                             .baseCalculoConcept(d.getBaseCalculo())
                             .valorResultConcept(d.getValorResultado())
+                            .observacionConcept(d.getObservacion())
                             .build();
                 })
                 .collect(Collectors.toList());
@@ -463,4 +466,6 @@ public class CalculoNominaEngine {
                         ? n.getCantidadDiasNovedad() : 0)
                 .sum();
     }
+    
+
 }

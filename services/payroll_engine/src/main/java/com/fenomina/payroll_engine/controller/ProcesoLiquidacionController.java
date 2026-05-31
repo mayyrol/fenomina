@@ -9,6 +9,7 @@ import com.fenomina.payroll_engine.entity.ProcesoLiquidacion;
 import com.fenomina.payroll_engine.enums.EstadoProceso;
 import com.fenomina.payroll_engine.enums.TipoProceso;
 import com.fenomina.payroll_engine.security.SecurityUtils;
+import com.fenomina.payroll_engine.service.proceso.ResultadoCambioEstado;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -77,9 +78,7 @@ public class ProcesoLiquidacionController {
                     .toList();
         }
 
-        List<ProcesoLiquidacionResponseDTO> response = procesos.stream()
-                .map(mapper::toResponse)
-                .toList();
+        List<ProcesoLiquidacionResponseDTO> response = mapper.toResponseList(procesos);
 
         return ResponseEntity.ok(response);
     }
@@ -111,16 +110,35 @@ public class ProcesoLiquidacionController {
             @Valid @RequestBody CambiarEstadoProcesoRequestDTO request
     ) {
         Long usuarioId = SecurityUtils.getCurrentUserId();
-        log.info("Cambiando estado proceso {} a {} - usuario: {}",
-                id, request.nuevoEstado(), usuarioId);
 
-        ProcesoLiquidacion proceso = procesoService.cambiarEstado(
+        ResultadoCambioEstado resultado = procesoService.cambiarEstado(
                 id,
                 EstadoProceso.valueOf(request.nuevoEstado()),
                 usuarioId
         );
 
-        return ResponseEntity.ok(mapper.toResponse(proceso));
+        ProcesoLiquidacionResponseDTO response = mapper.toResponse(resultado.proceso());
+
+        if (!resultado.advertencias().isEmpty()) {
+            response = new ProcesoLiquidacionResponseDTO(
+                    response.procesoLiquiId(),
+                    response.fkIdEmpresa(),
+                    response.tipoProceso(),
+                    response.estadoProcNomina(),
+                    response.anio(),
+                    response.periodo(),
+                    response.fechaInicioPeriodo(),
+                    response.fechaFinPeriodo(),
+                    response.createdAt(),
+                    response.updatedAt(),
+                    response.cantidadEmpleados(),
+                    response.totalNeto(),
+                    response.totalIntereses(),
+                    resultado.advertencias()
+            );
+        }
+
+        return ResponseEntity.ok(response);
     }
 
     @DeleteMapping("/{id}")

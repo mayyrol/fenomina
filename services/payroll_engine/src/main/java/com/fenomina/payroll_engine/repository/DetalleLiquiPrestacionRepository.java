@@ -1,6 +1,7 @@
 package com.fenomina.payroll_engine.repository;
 
 import com.fenomina.payroll_engine.entity.DetalleLiquiPrestacion;
+import com.fenomina.payroll_engine.entity.ProcesoLiquidacion;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -38,4 +39,10 @@ public interface DetalleLiquiPrestacionRepository extends JpaRepository<DetalleL
             @Param("empleadoId") Long empleadoId,
             @Param("anio") Integer anio
     );
+
+    @Query("SELECT d FROM DetalleLiquiPrestacion d " +
+            "WHERE d.fkCabeLiquiPrestacionId IN :cabeceraIds")
+    List<DetalleLiquiPrestacion> findByCabeceraIds(
+            @Param("cabeceraIds") List<Long> cabeceraIds);
+
 }

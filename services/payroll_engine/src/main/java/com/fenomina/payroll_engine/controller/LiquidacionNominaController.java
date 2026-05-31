@@ -97,7 +97,7 @@ public class LiquidacionNominaController {
                         )
                 );
             }
-            if (dias != null && dias <= 0) {
+            if (dias != null && dias < 0) {
                 throw new ValidacionNominaException(
                         "diasLaborados",
                         String.format(

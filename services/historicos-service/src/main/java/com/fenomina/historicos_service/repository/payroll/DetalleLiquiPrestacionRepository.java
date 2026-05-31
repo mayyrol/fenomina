@@ -23,7 +23,7 @@ public interface DetalleLiquiPrestacionRepository extends JpaRepository<DetalleL
             emp.apellidos_emp,
             emp.salario_basc_mensual,
             emp.tiene_aux_transporte,
-            emp.fondo_pension_emp,
+            emp.fondo_cesantias_emp,
             emp.fecha_ingreso_emp,
             clp.anio_liqui_prestacion,
             clp.periodo_liqui_prestacion,
@@ -37,8 +37,10 @@ public interface DetalleLiquiPrestacionRepository extends JpaRepository<DetalleL
             dlp.valor_neto_presta,
             dlp.valor_int_cesantias,
             dlp.promedio_var_periodo,
+            dlp.promedio_aux_transporte,
             cn.nombre_concep_nomina,
-            cn.concep_nomina_id
+            cn.concep_nomina_id,
+            pl.estado_proc_nomina AS estado_proceso
         FROM payroll.detalle_liqui_prestacion dlp
         JOIN payroll.cabecera_liqui_prestacion clp
             ON dlp.fk_cabe_liqui_prestacion_id = clp.cabe_liqui_prestacion_id
@@ -51,7 +53,7 @@ public interface DetalleLiquiPrestacionRepository extends JpaRepository<DetalleL
         WHERE pl.fk_id_empresa = :empresaId
           AND clp.deleted_at IS NULL
           AND emp.deleted_at IS NULL
-          AND pl.estado_proc_nomina = 'PAGADO'
+          AND pl.estado_proc_nomina IN ('PENDIENTE_PAGO', 'PAGADO')
           AND (:tipoProceso IS NULL OR pl.tipo_proceso = :tipoProceso)
           AND (:anio IS NULL OR clp.anio_liqui_prestacion = :anio)
           AND (:periodo IS NULL OR clp.periodo_liqui_prestacion = :periodo)
@@ -90,7 +92,8 @@ public interface DetalleLiquiPrestacionRepository extends JpaRepository<DetalleL
             pl.tipo_proceso,
             SUM(dlp.valor_neto_presta)      AS total_neto,
             SUM(dlp.valor_int_cesantias)    AS total_intereses_cesantias,
-            COUNT(DISTINCT dlp.fk_empleado_id) AS total_empleados
+            COUNT(DISTINCT dlp.fk_empleado_id) AS total_empleados,
+            pl.estado_proc_nomina AS estado_proceso
         FROM payroll.detalle_liqui_prestacion dlp
         JOIN payroll.cabecera_liqui_prestacion clp
             ON dlp.fk_cabe_liqui_prestacion_id = clp.cabe_liqui_prestacion_id
@@ -98,11 +101,11 @@ public interface DetalleLiquiPrestacionRepository extends JpaRepository<DetalleL
             ON clp.fk_proceso_liqui_id = pl.proceso_liqui_id
         WHERE pl.fk_id_empresa = :empresaId
           AND clp.deleted_at IS NULL
-          AND pl.estado_proc_nomina = 'PAGADO'        
+          AND pl.estado_proc_nomina IN ('PENDIENTE_PAGO', 'PAGADO')       
           AND (:tipoProceso IS NULL OR pl.tipo_proceso = :tipoProceso)
           AND (:anio IS NULL OR clp.anio_liqui_prestacion = :anio)
           AND (:periodo IS NULL OR clp.periodo_liqui_prestacion = :periodo)
-        GROUP BY clp.anio_liqui_prestacion, clp.periodo_liqui_prestacion, pl.tipo_proceso
+        GROUP BY clp.anio_liqui_prestacion, clp.periodo_liqui_prestacion, pl.tipo_proceso, pl.estado_proc_nomina
         ORDER BY clp.anio_liqui_prestacion DESC, clp.periodo_liqui_prestacion DESC
         """,
             countQuery = """
@@ -111,7 +114,10 @@ public interface DetalleLiquiPrestacionRepository extends JpaRepository<DetalleL
         JOIN payroll.cabecera_liqui_prestacion clp
             ON dlp.fk_cabe_liqui_prestacion_id = clp.cabe_liqui_prestacion_id
         JOIN payroll.proceso_liquidacion pl ON clp.fk_proceso_liqui_id = pl.proceso_liqui_id
-        WHERE pl.fk_id_empresa = :empresaId AND clp.deleted_at IS NULL
+        WHERE pl.fk_id_empresa = :empresaId 
+          AND clp.deleted_at IS NULL
+          AND pl.estado_proc_nomina IN ('PENDIENTE_PAGO', 'PAGADO')
+        
         """,
             nativeQuery = true)
     Page<Object[]> findTotalesPrestacionesPorEmpresaYPeriodo(

@@ -13,7 +13,7 @@ public class ReporteVacacionesTotalDTO {
     private Integer anio;
     private Integer periodo;
     private LocalDate fechaPeriodo;
-    private BigDecimal totalVacacionesRemuneradas;
-    private BigDecimal totalVacacionesNoRemuneradas;
+    private BigDecimal totalVacacionesCompensadas;
+    private BigDecimal totalVacacionesDisfrutadas;
     private BigDecimal totalVacaciones;
 }

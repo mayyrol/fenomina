@@ -20,14 +20,13 @@ public interface NominaCabeceraRepository extends JpaRepository<NominaCabecera, 
         WHERE pl.fkIdEmpresa = :empresaId
           AND (:anio IS NULL OR nc.anioCabecNomina = :anio)
           AND (:periodo IS NULL OR nc.periodoCotiNomina = :periodo)
-          AND (:estado IS NULL OR pl.estadoProcNomina = :estado)
+          AND pl.estadoProcNomina IN ('PENDIENTE_PAGO', 'PAGADO')
         ORDER BY nc.anioCabecNomina DESC, nc.periodoCotiNomina DESC
         """)
     Page<NominaCabecera> findByEmpresaYFiltros(
             @Param("empresaId") Long empresaId,
             @Param("anio") Integer anio,
             @Param("periodo") Integer periodo,
-            @Param("estado") String estado,
             Pageable pageable
     );
 
@@ -42,21 +41,23 @@ public interface NominaCabeceraRepository extends JpaRepository<NominaCabecera, 
             SUM(nc.total_devengado_emp)    AS total_devengado,
             SUM(nc.total_deduccion_emp)    AS total_deducciones,
             SUM(nc.costo_total_empresa)    AS total_costo_empresa,
-            COUNT(nc.cabec_nomina_id)      AS total_empleados
+            COUNT(nc.cabec_nomina_id)      AS total_empleados,
+            pl.estado_proc_nomina AS estado_proceso
         FROM payroll.nomina_cabecera nc
         JOIN payroll.proceso_liquidacion pl ON nc.fk_proceso_liqui_id = pl.proceso_liqui_id
         WHERE pl.fk_id_empresa = :empresaId
           AND nc.deleted_at IS NULL
+          AND pl.estado_proc_nomina IN ('PENDIENTE_PAGO', 'PAGADO')
           AND (:anio IS NULL OR pl.anio = :anio)
           AND (:periodo IS NULL OR pl.periodo = :periodo)
-        GROUP BY pl.anio, pl.periodo, pl.fecha_inicio_periodo, pl.fecha_fin_periodo
+        GROUP BY pl.anio, pl.periodo, pl.fecha_inicio_periodo, pl.fecha_fin_periodo, pl.estado_proc_nomina
         ORDER BY pl.anio DESC, pl.periodo DESC
         """,
             countQuery = """
         SELECT COUNT(DISTINCT CONCAT(pl.anio, '-', pl.periodo))
         FROM payroll.nomina_cabecera nc
         JOIN payroll.proceso_liquidacion pl ON nc.fk_proceso_liqui_id = pl.proceso_liqui_id
-        WHERE pl.fk_id_empresa = :empresaId AND nc.deleted_at IS NULL
+        WHERE pl.fk_id_empresa = :empresaId AND nc.deleted_at IS NULL AND pl.estado_proc_nomina IN ('PENDIENTE_PAGO', 'PAGADO')
         """,
             nativeQuery = true)
     Page<Object[]> findTotalesNominaPorEmpresaYPeriodo(

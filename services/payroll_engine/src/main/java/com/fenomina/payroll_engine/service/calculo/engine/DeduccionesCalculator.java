@@ -136,6 +136,12 @@ public class DeduccionesCalculator {
                 ? calcularIbcProporcional(ctx.getIbcPensionAnterior(), diasLnr)
                 : calcularIbcProporcional(ibc.getIbcPension(), diasLnr);
 
+        BigDecimal salarioDia = ctx.getEmpleado().salarioBascMensual()
+                .divide(DIAS_MES, ESCALA, RoundingMode.HALF_UP);
+        BigDecimal valorDescuentoLnr = salarioDia
+                .multiply(BigDecimal.valueOf(diasLnr))
+                .setScale(ESCALA, RoundingMode.HALF_UP);
+
         // Salud: solo empleador adelanta, empleado no aporta
         // Se registra como informativo en deducciones del empleado
         // El cargo real va a SeguridadSocialCalculator como aporte patronal
@@ -159,6 +165,15 @@ public class DeduccionesCalculator {
                             "Aporte pensión por %d día(s) de licencia no remunerada. " +
                                     "Empleador adelanta y recupera en siguiente periodo con devengado disponible",
                             diasLnr))
+                    .build());
+
+            aportes.add(DeduccionCalculada.builder()
+                    .nombreConcepto("Licencias no remuneradas")
+                    .baseCalculo(ctx.getEmpleado().salarioBascMensual())
+                    .porcentaje(null)
+                    .cantidad(BigDecimal.valueOf(diasLnr))
+                    .valorResultado(valorDescuentoLnr)
+                    .esAporteLicenciaNoRemunerada(false)
                     .build());
         }
 
@@ -203,6 +218,7 @@ public class DeduccionesCalculator {
                                 .valorResultado(novedad.getValorRefNovedad())
                                 .esAporteLicenciaNoRemunerada(false)
                                 .novedadId(novedad.getNovedadId())
+                                .observacion(novedad.getObservaciones())
                                 .build());
                     }
                 }

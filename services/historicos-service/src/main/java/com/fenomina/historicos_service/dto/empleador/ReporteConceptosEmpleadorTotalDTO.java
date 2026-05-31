@@ -14,6 +14,5 @@ public class ReporteConceptosEmpleadorTotalDTO {
     private BigDecimal totalSegSocialEmpr;
     private BigDecimal totalAportesParafEmpr;
     private BigDecimal cargPresPrimas;
-    private BigDecimal cargPresVacaciones;
     private BigDecimal cargPresIntCesantias;
 }

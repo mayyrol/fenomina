@@ -27,5 +27,7 @@ public class ReporteCesantiasEmpresaDTO {
     private BigDecimal baseLiquiTotal;
     private BigDecimal cesantias;
     private BigDecimal interesesCesantias;
-    private String fondoPensionEmp;
+    private String fondoCesantiasEmp;
+    private String estadoProceso;
+    private BigDecimal promedioAuxTransporte;
 }

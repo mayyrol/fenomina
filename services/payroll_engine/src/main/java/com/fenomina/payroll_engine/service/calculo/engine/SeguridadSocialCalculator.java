@@ -269,17 +269,20 @@ public class SeguridadSocialCalculator {
         // Tipo 20 (estudiante Ley 789): exento de SENA e ICBF por ley
         boolean estudianteLey789 = "20".equals(tipoCotizante);
 
-        // CCF: siempre aplica para dependientes, nunca exonerado
         BigDecimal porcentajeCcf = ctx.getParametrosPorNombre()
                 .get("CAJA_COMPENSACION").porcentajeParamGeneral();
+        // CCF: siempre aplica para dependientes, nunca exonerado
+        BigDecimal baseCcf = baseParafiscales.compareTo(smmlv) < 0
+                ? smmlv
+                : baseParafiscales;
 
-        BigDecimal valorCcf = baseParafiscales
+        BigDecimal valorCcf = baseCcf
                 .multiply(porcentajeCcf)
                 .setScale(ESCALA, RoundingMode.HALF_UP);
 
         aportes.add(AportePatronalCalculado.builder()
                 .nombreConcepto("Caja de compensación empleador")
-                .baseCalculo(baseParafiscales)
+                .baseCalculo(baseCcf)
                 .porcentaje(porcentajeCcf)
                 .valorResultado(valorCcf)
                 .esAporteLicenciaNoRemunerada(false)

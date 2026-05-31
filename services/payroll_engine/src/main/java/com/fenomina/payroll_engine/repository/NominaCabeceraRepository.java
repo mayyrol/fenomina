@@ -84,4 +84,16 @@ public interface NominaCabeceraRepository extends JpaRepository<NominaCabecera, 
             @Param("fechaInicio") LocalDate fechaInicio,
             @Param("fechaFin") LocalDate fechaFin
     );
+
+    @Query("SELECT nc.fkProcesoLiquiId, COUNT(nc) " +
+            "FROM NominaCabecera nc " +
+            "WHERE nc.fkProcesoLiquiId IN :procesoIds " +
+            "GROUP BY nc.fkProcesoLiquiId")
+    List<Object[]> countByProcesoIds(@Param("procesoIds") List<Long> procesoIds);
+
+    @Query("SELECT nc.fkProcesoLiquiId, COALESCE(SUM(nc.netoNominaEmp), 0) " +
+            "FROM NominaCabecera nc " +
+            "WHERE nc.fkProcesoLiquiId IN :procesoIds " +
+            "GROUP BY nc.fkProcesoLiquiId")
+    List<Object[]> sumNetoByProcesoIds(@Param("procesoIds") List<Long> procesoIds);
 }

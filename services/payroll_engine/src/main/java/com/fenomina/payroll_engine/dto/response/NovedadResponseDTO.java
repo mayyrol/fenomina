@@ -19,6 +19,7 @@ public record NovedadResponseDTO(
         BigDecimal cantidadHorasNovedad,
         BigDecimal valorRefNovedad,
         String observaciones,
+        String tipoVacacion,
         LocalDateTime createdAt,
         LocalDateTime updatedAt
 ) {}

@@ -189,6 +189,10 @@ public class NovedadServiceImpl implements NovedadService {
                     novedad.getFechaInicioAusen(),
                     novedad.getFechaFinAusen()
             ) + 1;
+            if (dias > 30) {
+                dias = 30;
+            }
+
             novedad.setCantidadDiasNovedad((int) dias);
         }
     }

@@ -16,4 +16,6 @@ public class DeduccionCalculada {
     private final boolean esAporteLicenciaNoRemunerada;
     private final Long novedadId;
     private final String textoInformativo;
+    private final String observacion;
+    private final BigDecimal cantidad;
 }

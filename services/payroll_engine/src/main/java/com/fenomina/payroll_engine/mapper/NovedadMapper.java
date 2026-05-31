@@ -31,6 +31,7 @@ public class NovedadMapper {
         novedad.setValorRefNovedad(request.valorRefNovedad());
         novedad.setObservaciones(request.observaciones());
         novedad.setCreatedBy(usuarioId);
+        novedad.setTipoVacacion(request.tipoVacacion());
         return novedad;
     }
 
@@ -56,6 +57,7 @@ public class NovedadMapper {
                 novedad.getCantidadHorasNovedad(),
                 novedad.getValorRefNovedad(),
                 novedad.getObservaciones(),
+                novedad.getTipoVacacion(),
                 novedad.getCreatedAt(),
                 novedad.getUpdatedAt()
         );

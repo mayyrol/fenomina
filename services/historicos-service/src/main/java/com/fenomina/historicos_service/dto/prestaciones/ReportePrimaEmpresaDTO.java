@@ -25,4 +25,6 @@ public class ReportePrimaEmpresaDTO {
     private BigDecimal promedioVarPeriodo; // otros: horas extra + bonificaciones
     private BigDecimal baseLiquiTotal;
     private BigDecimal valorNetoPrima;
+    private String estadoProceso;
+    private BigDecimal promedioAuxTransporte;
 }

@@ -5,6 +5,8 @@ import com.fenomina.payroll_engine.domain.vo.ContextoLiquidacion;
 import com.fenomina.payroll_engine.domain.vo.DevengoCalculado;
 import com.fenomina.payroll_engine.client.dto.ConceptoNominaDTO;
 import com.fenomina.payroll_engine.client.dto.ContratoConceptoDTO;
+import com.fenomina.payroll_engine.repository.ReporteNominaDetalleRepository;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
@@ -13,13 +15,17 @@ import java.util.ArrayList;
 import java.util.List;
 
 @Component
+@RequiredArgsConstructor
 public class DevengosCalculator {
 
     private static final int ESCALA = 2;
     private static final BigDecimal DIAS_MES = BigDecimal.valueOf(30);
-    private static final BigDecimal PORCENTAJE_INCAPACIDAD_COMUN = new BigDecimal("0.6666");
     private static final BigDecimal PORCENTAJE_INCAPACIDAD_LABORAL = BigDecimal.ONE;
-    private static final int DIAS_EMPLEADOR_INCAPACIDAD_COMUN = 2;
+    private static final BigDecimal PORCENTAJE_66 = new BigDecimal("0.6667");
+    private static final BigDecimal PORCENTAJE_50 = new BigDecimal("0.50");
+    private static final int DIAS_EMPLEADOR = 2;
+    private static final int DIAS_TOPE_EPS = 90;
+    private final ReporteNominaDetalleRepository reporteNominaDetalleRepository;
 
 
     private BigDecimal calcularValorHoraOrdinaria(ContextoLiquidacion ctx) {
@@ -51,9 +57,16 @@ public class DevengosCalculator {
 
             if (concepto == null) continue;
 
-            DevengoCalculado devengo = resolverDevengoNovedad(ctx, novedad, concepto);
-            if (devengo != null) {
-                devengos.add(devengo);
+            String nombre = concepto.nombreConcepNomina();
+
+            // Incapacidad común puede retornar múltiples devengos (desglose 66/50)
+            if ("Incapacidad por enfermedad general".equals(nombre)) {
+                devengos.addAll(calcularIncapacidadComun(ctx, novedad, concepto));
+            } else {
+                DevengoCalculado devengo = resolverDevengoNovedad(ctx, novedad, concepto);
+                if (devengo != null) {
+                    devengos.add(devengo);
+                }
             }
         }
 
@@ -146,9 +159,6 @@ public class DevengosCalculator {
                  "Recargo diurno dominical o festivo",
                  "Recargo nocturno dominical o festivo" ->
                     calcularRecargo(ctx, novedad, concepto, nombre);
-
-            case "Incapacidad por enfermedad general" ->
-                    calcularIncapacidadComun(ctx, novedad, concepto);
 
             case "Incapacidad por origen laboral" ->
                     calcularIncapacidadLaboral(ctx, novedad, concepto);
@@ -273,46 +283,156 @@ public class DevengosCalculator {
 
     // --- Incapacidad origen común ---
 
-    private DevengoCalculado calcularIncapacidadComun(
+    private List<DevengoCalculado> calcularIncapacidadComun(
             ContextoLiquidacion ctx,
             Novedad novedad,
             ConceptoNominaDTO concepto
     ) {
-        int diasTotales = novedad.getCantidadDiasNovedad() != null
+        List<DevengoCalculado> resultado = new ArrayList<>();
+
+        int diasIngresados = novedad.getCantidadDiasNovedad() != null
                 ? novedad.getCantidadDiasNovedad() : 0;
 
-        // El empleador solo paga los primeros 2 días
-        int diasEmpleador = Math.min(diasTotales, DIAS_EMPLEADOR_INCAPACIDAD_COMUN);
+        if (diasIngresados == 0) return resultado;
 
-        if (diasEmpleador == 0) return null;
+        BigDecimal salario = ctx.getEmpleado().salarioBascMensual();
+        BigDecimal smmlv = ctx.getParametrosPorNombre()
+                .get("SMMLV").valorParamGeneral();
+        BigDecimal valorDiaSmmlv = smmlv
+                .divide(DIAS_MES, ESCALA, RoundingMode.HALF_UP);
 
-        // Días 1-2: empleador paga al 100% del salario ordinario (no del IBC)
-        BigDecimal salarioBase = ctx.getEmpleado().salarioBascMensual();
-        BigDecimal valorDia = salarioBase.divide(DIAS_MES, ESCALA, RoundingMode.HALF_UP);
-        BigDecimal valorEmpleador = valorDia
-                .multiply(BigDecimal.valueOf(diasEmpleador))
+        // --- Caso 1: exactamente 2 días, empleador al 100% ---
+        if (diasIngresados <= DIAS_EMPLEADOR) {
+            BigDecimal valorDia = salario.divide(DIAS_MES, ESCALA, RoundingMode.HALF_UP);
+            BigDecimal valor = valorDia
+                    .multiply(BigDecimal.valueOf(diasIngresados))
+                    .setScale(ESCALA, RoundingMode.HALF_UP);
+
+            resultado.add(DevengoCalculado.builder()
+                    .concepNominaId(concepto.concepNominaId())
+                    .nombreConcepto(concepto.nombreConcepNomina())
+                    .cantidad(diasIngresados)
+                    .baseCalculo(salario)
+                    .valorResultado(valor)
+                    .esSalario(true)
+                    .esIbc(true)
+                    .esAuxilioTransporte(false)
+                    .novedadId(novedad.getNovedadId())
+                    .textoInformativo("Días 1-2 a cargo del empleador al 100% del salario")
+                    .build());
+
+            return resultado;
+        }
+
+        // --- Caso 2: más de 2 días ---
+        // Calcular valor día con piso SMMLV para tramo 66.67%
+        BigDecimal valorDia66 = salario
+                .divide(DIAS_MES, ESCALA, RoundingMode.HALF_UP)
+                .multiply(PORCENTAJE_66)
                 .setScale(ESCALA, RoundingMode.HALF_UP);
 
-        int diasEps = diasTotales - diasEmpleador;
+        BigDecimal valorDiaFinal66 = valorDia66.max(valorDiaSmmlv);
 
-        String textoInformativo = diasEps > 0
-                ? String.format("Empleador paga días 1-%d. EPS reconoce %d día(s) restante(s) " +
-                        "al 66.66%% del IBL desde el día 3",
-                diasEmpleador, diasEps)
-                : null;
+        // Calcular valor día con piso SMMLV para tramo 50%
+        BigDecimal valorDia50 = salario
+                .divide(DIAS_MES, ESCALA, RoundingMode.HALF_UP)
+                .multiply(PORCENTAJE_50)
+                .setScale(ESCALA, RoundingMode.HALF_UP);
 
+        BigDecimal valorDiaFinal50 = valorDia50.max(valorDiaSmmlv);
+
+        // Consultar días acumulados de períodos anteriores
+        Long concepId = concepto.concepNominaId();
+        int diasAcumulados = obtenerDiasAcumulados(
+                ctx, concepId);
+
+        // Determinar desglose
+        if (diasAcumulados >= DIAS_TOPE_EPS) {
+            // Todo al 50%
+            BigDecimal valor = valorDiaFinal50
+                    .multiply(BigDecimal.valueOf(diasIngresados))
+                    .setScale(ESCALA, RoundingMode.HALF_UP);
+
+            resultado.add(construirDevengoIncapacidad(
+                    concepto, novedad, diasIngresados, salario, valor,
+                    "Incapacidad por enfermedad general (50%)",
+                    String.format("Incapacidad EPS al 50%% (%d días, acumulado >= 90)", diasIngresados)));
+
+        } else if (diasAcumulados + diasIngresados <= DIAS_TOPE_EPS) {
+            // Todo al 66.67%
+            BigDecimal valor = valorDiaFinal66
+                    .multiply(BigDecimal.valueOf(diasIngresados))
+                    .setScale(ESCALA, RoundingMode.HALF_UP);
+
+            resultado.add(construirDevengoIncapacidad(
+                    concepto, novedad, diasIngresados, salario, valor,
+                    "Incapacidad por enfermedad general (66.67%)",
+                    String.format("Incapacidad EPS al 66.67%% (%d días)", diasIngresados)));
+
+        } else {
+            // Desglose: parte al 66.67% y parte al 50%
+            int diasAl66 = DIAS_TOPE_EPS - diasAcumulados;
+            int diasAl50 = diasIngresados - diasAl66;
+
+            BigDecimal valor66 = valorDiaFinal66
+                    .multiply(BigDecimal.valueOf(diasAl66))
+                    .setScale(ESCALA, RoundingMode.HALF_UP);
+
+            BigDecimal valor50 = valorDiaFinal50
+                    .multiply(BigDecimal.valueOf(diasAl50))
+                    .setScale(ESCALA, RoundingMode.HALF_UP);
+
+            resultado.add(construirDevengoIncapacidad(
+                    concepto, novedad, diasAl66, salario, valor66,
+                    "Incapacidad por enfermedad general (66.67%)",
+                    String.format("Incapacidad EPS al 66.67%% (%d días)", diasAl66)));
+
+            resultado.add(construirDevengoIncapacidad(
+                    concepto, novedad, diasAl50, salario, valor50,
+                    "Incapacidad por enfermedad general (50%)",
+                    String.format("Incapacidad EPS al 50%% (%d días, acumulado supera 90)", diasAl50)));
+        }
+
+        return resultado;
+    }
+
+    private DevengoCalculado construirDevengoIncapacidad(
+            ConceptoNominaDTO concepto,
+            Novedad novedad,
+            int dias,
+            BigDecimal salario,
+            BigDecimal valor,
+            String nombreMostrar,
+            String textoInformativo
+    ) {
         return DevengoCalculado.builder()
                 .concepNominaId(concepto.concepNominaId())
-                .nombreConcepto(concepto.nombreConcepNomina())
-                .cantidad(diasEmpleador)
-                .baseCalculo(salarioBase)
-                .valorResultado(valorEmpleador)
+                .nombreConcepto(nombreMostrar)
+                .cantidad(dias)
+                .baseCalculo(salario)
+                .valorResultado(valor)
                 .esSalario(true)
                 .esIbc(true)
                 .esAuxilioTransporte(false)
                 .novedadId(novedad.getNovedadId())
                 .textoInformativo(textoInformativo)
                 .build();
+    }
+
+    private int obtenerDiasAcumulados(
+            ContextoLiquidacion ctx,
+            Long concepNominaId
+    ) {
+        // Buscar el repositorio a través del contexto no es posible directamente,
+        // así que lo inyectamos vía constructor — ver ajuste 4
+        BigDecimal acumulado = reporteNominaDetalleRepository
+                .sumDiasIncapacidadAcumulados(
+                        ctx.getEmpleado().empleadoId(),
+                        concepNominaId,
+                        ctx.getAnio(),
+                        ctx.getPeriodo()
+                );
+        return acumulado != null ? acumulado.intValue() : 0;
     }
 
     // --- Incapacidad origen laboral ---
@@ -345,9 +465,9 @@ public class DevengosCalculator {
                 .baseCalculo(ibcBase)
                 .valorResultado(valorArl)
                 .esSalario(true)
-                .esIbc(false)
+                .esIbc(true)
                 .esAuxilioTransporte(false)
-                .esInformativo(true)
+                .esInformativo(false)
                 .novedadId(novedad.getNovedadId())
                 .textoInformativo(String.format(
                         "ARL reconoce %d día(s) al 100%% del IBL desde el día 1",
@@ -501,6 +621,7 @@ public class DevengosCalculator {
                 .esIbc(concepto.esIbc())
                 .esAuxilioTransporte(false)
                 .novedadId(novedad.getNovedadId())
+                .observacion(novedad.getObservaciones())
                 .build();
     }
 

@@ -117,25 +117,22 @@ public class LiquidacionPrimaServiceImpl implements LiquidacionPrimaService {
         EmpleadoDTO empleado = empleadosPorId.get(empleadoId);
         if (empleado == null) {
             throw new CalculoNominaException(
-                    String.format("Empleado %d no encontrado o no activo", empleadoId)
-            );
+                    String.format("Empleado %d no encontrado o no activo", empleadoId));
         }
 
-        // Salario integral no genera prima ordinaria
         if (Boolean.TRUE.equals(empleado.esSalarioIntegral())) {
             log.debug("Empleado {} tiene salario integral, se omite prima ordinaria", empleadoId);
             return;
         }
 
-        // --- Fechas reales del empleado en el semestre ---
         LocalDate fechaIngreso = empleado.fechaIngresoEmp();
         LocalDate fechaInicioReal = fechaIngreso.isAfter(fechaInicioPeriodo)
-                ? fechaIngreso
-                : fechaInicioPeriodo;
+                ? fechaIngreso : fechaInicioPeriodo;
 
         int periodoInicio = fechaInicioPeriodo.getMonthValue();
         int periodoFin = fechaFinPeriodo.getMonthValue();
 
+        // Nóminas pagadas del semestre
         List<NominaCabecera> nominasSemestre = nominaCabeceraRepository
                 .findByEmpleadoAndRangoPeriodo(
                         empleadoId,
@@ -145,54 +142,37 @@ public class LiquidacionPrimaServiceImpl implements LiquidacionPrimaService {
                         EstadoProceso.PAGADO
                 );
 
+        // Días laborados: suma de cantidad_concept del concepto salario (ID=1)
         int diasLiquidados;
         if (!nominasSemestre.isEmpty()) {
-            // Sumar días laborados reales desde reporte_nomina_detalle (concepto ID=1)
             diasLiquidados = nominasSemestre.stream()
                     .mapToInt(nc -> reporteNominaDetalleRepository
                             .findByFkCabecNominaId(nc.getCabecNominaId())
                             .stream()
                             .filter(d -> d.getFkConcepNominaId() != null &&
-                                    d.getFkConcepNominaId() == 1L)
+                                    d.getFkConcepNominaId().equals(1L))
                             .mapToInt(d -> d.getCantidadConcept() != null
                                     ? d.getCantidadConcept().intValue() : 0)
                             .sum())
                     .sum();
             diasLiquidados = Math.min(diasLiquidados, DIAS_SEMESTRE);
         } else {
-            // Sin nóminas pagadas, calcular por fechas
             diasLiquidados = LiquidacionFechaUtils.calcularDias(fechaInicioReal, fechaFinPeriodo);
             diasLiquidados = Math.min(diasLiquidados, DIAS_SEMESTRE);
         }
 
-        // --- Base de liquidación ---
-        // Para salario fijo: salario del último mes del semestre
-        // Para salario variable: promedio de devengados salariales del semestre
-        BigDecimal salarioBase;
-        BigDecimal auxTransporteEmpleado = Boolean.TRUE.equals(empleado.tieneAuxTransporte())
-                ? auxTransporte : BigDecimal.ZERO;
+        // Calcular base y aux promedio
+        BigDecimal[] resultado = calcularBaseYAux(
+                nominasSemestre, empleado, periodoInicio, periodoFin);
+        BigDecimal baseLiquidacion = resultado[0];
+        BigDecimal auxPromedio = resultado[1];
+        BigDecimal salarioPromedio = baseLiquidacion.subtract(auxPromedio);
 
-        if (nominasSemestre.isEmpty()) {
-            // Sin nóminas pagadas en el semestre, se usa el salario registrado
-            salarioBase = empleado.salarioBascMensual();
-        } else {
-            salarioBase = calcularSalarioBase(nominasSemestre, empleado, conceptosPorNombre);
-        }
-
-        BigDecimal baseLiquidacion;
-        if (nominasSemestre.isEmpty()) {
-            // Sin nóminas: salario registrado + auxilio de transporte
-            baseLiquidacion = salarioBase.add(auxTransporteEmpleado);
-        } else {
-            // Con nóminas: el promedio ya incluye el auxilio de transporte
-            baseLiquidacion = salarioBase;
-        }
-
+        // Fórmula prima: base × días / 360
         BigDecimal valorPrima = baseLiquidacion
                 .multiply(BigDecimal.valueOf(diasLiquidados))
                 .divide(BigDecimal.valueOf(DIAS_ANIO), ESCALA, RoundingMode.HALF_UP);
 
-        // --- Persistir detalle ---
         ConceptoNominaDTO conceptoPrima = conceptosPorNombre.get("Prima de servicios");
 
         DetalleLiquiPrestacion detalle = DetalleLiquiPrestacion.builder()
@@ -203,64 +183,81 @@ public class LiquidacionPrimaServiceImpl implements LiquidacionPrimaService {
                 .fechaInicioCorteEmp(fechaInicioReal)
                 .fechaFinCorteEmp(fechaFinPeriodo)
                 .diasLiquidadosInt(diasLiquidados)
-                .salarioFijoMomento(salarioBase)
+                .salarioFijoMomento(salarioPromedio)
+                .promedioAuxTransporte(auxPromedio)
                 .baseLiquiTotal(baseLiquidacion)
                 .valorNetaPresta(valorPrima)
                 .build();
 
         detalleLiquiPrestacionRepository.save(detalle);
 
-        log.debug("Prima empleado {}: días={}, base={}, valor={}",
-                empleadoId, diasLiquidados, baseLiquidacion, valorPrima);
+        log.debug("Prima empleado {}: meses={}, base={}, aux={}, días={}, valor={}",
+                empleadoId, diasLiquidados, baseLiquidacion, auxPromedio,
+                diasLiquidados, valorPrima);
     }
 
     // --- Cálculo de salario base ---
 
-    private BigDecimal calcularSalarioBase(
-            List<NominaCabecera> nominasSemestre,
+    private BigDecimal[] calcularBaseYAux(
+            List<NominaCabecera> nominas,
             EmpleadoDTO empleado,
-            Map<String, ConceptoNominaDTO> conceptosPorNombre
+            int periodoInicio,
+            int periodoFin
     ) {
-        if (nominasSemestre.isEmpty()) {
-            return empleado.salarioBascMensual();
+        if (nominas.isEmpty()) {
+            return new BigDecimal[]{
+                    empleado.salarioBascMensual(),
+                    BigDecimal.ZERO
+            };
         }
 
-        List<Long> conceptosSalarialesIds = conceptosPorNombre.values().stream()
-                .filter(c -> Boolean.TRUE.equals(c.esSalario())
-                        || "Auxilio de transporte".equals(c.nombreConcepNomina()))
-                .filter(c -> !"Vacaciones compensadas en dinero"
-                        .equals(c.nombreConcepNomina()))
-                .map(ConceptoNominaDTO::concepNominaId)
-                .collect(Collectors.toList());
+        // Agrupar por período (mes) para manejar quincenales
+        Map<Integer, BigDecimal> devengadoPorMes = new java.util.LinkedHashMap<>();
+        Map<Integer, BigDecimal> auxPorMes = new java.util.LinkedHashMap<>();
 
-        List<BigDecimal> devengadosPorPeriodo = nominasSemestre.stream()
-                .map(nc -> {
-                    List<com.fenomina.payroll_engine.entity.ReporteNominaDetalle> detalles =
-                            reporteNominaDetalleRepository
-                                    .findByFkCabecNominaId(nc.getCabecNominaId());
+        for (NominaCabecera nc : nominas) {
+            int mes = nc.getPeriodoCotiNomina();
 
-                    return detalles.stream()
-                            .filter(d -> conceptosSalarialesIds
-                                    .contains(d.getFkConcepNominaId()))
-                            .map(d -> d.getValorResultConcept() != null
-                                    ? d.getValorResultConcept()
-                                    : BigDecimal.ZERO)
-                            .reduce(BigDecimal.ZERO, BigDecimal::add);
-                })
-                .filter(v -> v.compareTo(BigDecimal.ZERO) > 0)
-                .collect(Collectors.toList());
+            // Solo meses dentro del semestre
+            if (mes < periodoInicio || mes > periodoFin) continue;
 
-        if (devengadosPorPeriodo.isEmpty()) {
-            return empleado.salarioBascMensual();
+            // Sumar total devengado por mes
+            devengadoPorMes.merge(mes,
+                    nc.getTotalDevengadoEmp() != null
+                            ? nc.getTotalDevengadoEmp() : BigDecimal.ZERO,
+                    BigDecimal::add);
+
+            // Sumar aux transporte del mes desde reporte_nomina_detalle
+            BigDecimal auxMes = reporteNominaDetalleRepository
+                    .findByFkCabecNominaId(nc.getCabecNominaId())
+                    .stream()
+                    .filter(d -> d.getFkConcepNominaId() != null
+                            && d.getFkConcepNominaId().equals(22L))
+                    .map(d -> d.getValorResultConcept() != null
+                            ? d.getValorResultConcept() : BigDecimal.ZERO)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+            auxPorMes.merge(mes, auxMes, BigDecimal::add);
         }
 
-        // Promedio de devengados salariales del semestre
-        BigDecimal sumaDevengados = devengadosPorPeriodo.stream()
+        int mesesConNomina = devengadoPorMes.size();
+        if (mesesConNomina == 0) {
+            return new BigDecimal[]{empleado.salarioBascMensual(), BigDecimal.ZERO};
+        }
+
+        BigDecimal sumaDevengados = devengadoPorMes.values().stream()
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal sumaAux = auxPorMes.values().stream()
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
-        return sumaDevengados
-                .divide(BigDecimal.valueOf(devengadosPorPeriodo.size()),
-                        ESCALA, RoundingMode.HALF_UP);
+        BigDecimal divisor = BigDecimal.valueOf(mesesConNomina);
+
+        BigDecimal baseLiquidacion = sumaDevengados
+                .divide(divisor, ESCALA, RoundingMode.HALF_UP);
+        BigDecimal auxPromedio = sumaAux
+                .divide(divisor, ESCALA, RoundingMode.HALF_UP);
+
+        return new BigDecimal[]{baseLiquidacion, auxPromedio};
     }
 
     // --- Helpers ---

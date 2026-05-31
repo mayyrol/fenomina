@@ -1,5 +1,6 @@
 package com.fenomina.payroll_engine.controller;
 
+import com.fenomina.payroll_engine.client.dto.ContratoConceptoDTO;
 import com.fenomina.payroll_engine.client.dto.ParametroGeneralDTO;
 import com.fenomina.payroll_engine.dto.response.DesprendiblePrestacionResponseDTO;
 import com.fenomina.payroll_engine.dto.response.DesprendibleResponseDTO;
@@ -75,6 +76,76 @@ public class DesprendibleController {
                     List<ReporteNominaDetalle> detalles = reporteNominaDetalleRepository
                             .findByFkCabecNominaId(cabecera.getCabecNominaId());
 
+                    String advertenciaNoSalarial = null;
+                    if (empleado != null) {
+                        // Calcular exceso no salarial real
+                        List<ReporteNominaDetalle> detallesEmpleado = detalles;
+
+                        // Obtener conceptos fijos no salariales del empleado
+                        List<com.fenomina.payroll_engine.client.dto.ContratoConceptoDTO> conceptosFijos =
+                                masterDataClient.findConceptosFijosByEmpleado(empleado.empleadoId());
+
+                        BigDecimal totalNoSalarialFijos = conceptosFijos.stream()
+                                .filter(c -> Boolean.FALSE.equals(c.esSalario()) && c.valorFijo() != null)
+                                .filter(c -> !"Bonificaciones ocasionales o por mera liberalidad"
+                                        .equals(c.nombreConcepto()))
+                                .map(com.fenomina.payroll_engine.client.dto.ContratoConceptoDTO::valorFijo)
+                                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+                        // Obtener novedades no salariales del período desde el reporte
+                        BigDecimal totalNoSalarialNovedades = detallesEmpleado.stream()
+                                .filter(d -> {
+                                    ConceptoNominaDTO c = conceptosPorId.get(d.getFkConcepNominaId());
+                                    return c != null
+                                            && "DEVENGO".equals(c.categoriaConcNomina())
+                                            && Boolean.FALSE.equals(c.esSalario())
+                                            && Boolean.FALSE.equals(c.esIbc())
+                                            && !"Bonificaciones ocasionales o por mera liberalidad"
+                                            .equals(c.nombreConcepNomina())
+                                            && !"Auxilio de transporte"
+                                            .equals(c.nombreConcepNomina())
+                                            && !"Vacaciones compensadas en dinero"
+                                            .equals(c.nombreConcepNomina())
+                                            && !"Cesantías".equals(c.nombreConcepNomina())
+                                            && !"Prima de servicios".equals(c.nombreConcepNomina())
+                                            && !"Intereses sobre las cesantías"
+                                            .equals(c.nombreConcepNomina());
+                                })
+                                .map(d -> d.getValorResultConcept() != null
+                                        ? d.getValorResultConcept() : BigDecimal.ZERO)
+                                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+                        BigDecimal totalNoSalarial = totalNoSalarialFijos.add(totalNoSalarialNovedades);
+                        BigDecimal totalSalarial = empleado.salarioBascMensual();
+                        BigDecimal totalRemuneracion = totalSalarial.add(totalNoSalarial);
+
+                        if (totalSalarial.compareTo(BigDecimal.ZERO) > 0
+                                && totalNoSalarial.compareTo(BigDecimal.ZERO) > 0) {
+                            BigDecimal limite = totalRemuneracion
+                                    .multiply(new BigDecimal("0.40"))
+                                    .setScale(2, java.math.RoundingMode.HALF_UP);
+                            BigDecimal exceso = totalNoSalarial.subtract(limite);
+
+                            log.debug("=== DEBUG TOPE 40% empleado {} ===", empleado.empleadoId());
+                            log.debug("totalSalarial: {}", totalSalarial);
+                            log.debug("totalNoSalarialFijos: {}", totalNoSalarialFijos);
+                            log.debug("totalNoSalarialNovedades: {}", totalNoSalarialNovedades);
+                            log.debug("totalNoSalarial: {}", totalNoSalarial);
+                            log.debug("totalRemuneracion: {}", totalRemuneracion);
+                            log.debug("limite: {}", limite);
+                            log.debug("exceso: {}", exceso);
+                            log.debug("=====================================");
+
+                            if (exceso.compareTo(BigDecimal.ZERO) > 0) {
+                                advertenciaNoSalarial = String.format(
+                                        "El IBC incluye $%s adicionales por exceso de pagos no salariales " +
+                                                "sobre el límite del 40%% (Art. 30 Ley 1393 de 2010).",
+                                        exceso.setScale(0, java.math.RoundingMode.HALF_UP)
+                                );
+                            }
+                        }
+                    }
+
                     return DesprendibleResponseDTO.builder()
                             .cabecNominaId(cabecera.getCabecNominaId())
                             .empleadoId(cabecera.getFkEmpleadoId())
@@ -92,6 +163,7 @@ public class DesprendibleController {
                             .totalDevengado(cabecera.getTotalDevengadoEmp())
                             .totalDeducciones(cabecera.getTotalDeduccionEmp())
                             .netoAPagar(cabecera.getNetoNominaEmp())
+                            .advertenciaNoSalarial(advertenciaNoSalarial)
                             .conceptos(detalles.stream()
                                     .map(d -> {
                                         ConceptoNominaDTO concepto = conceptosPorId
@@ -117,9 +189,11 @@ public class DesprendibleController {
                                                 .unidadCantidad(unidadCantidad)
                                                 .baseCalculo(d.getBaseCalculoConcept())
                                                 .valorResultado(d.getValorResultConcept())
+                                                .observacion(d.getObservacionConcept())
                                                 .build();
                                     })
                                     .toList())
+
                             .build();
                 })
                 .toList();
@@ -212,8 +286,7 @@ public class DesprendibleController {
                                     ? empleado.apellidosEmp() : "N/A")
                             .documentoEmpleado(empleado != null
                                     ? empleado.documentoEmp() : "N/A")
-                            .fondoPension(empleado != null
-                                    ? empleado.fondoPensionEmp() : "N/A")
+                            .fondoCesantias(empleado != null ? empleado.fondoCesantiasEmp() : "N/A")
                             .anio(cabecera.getAnioLiquiPrestacion())
                             .periodo(cabecera.getPeriodoLiquiPrestacion())
                             .fechaInicioCorte(detalle.getFechaInicioCorteEmp())
@@ -225,6 +298,10 @@ public class DesprendibleController {
                             .valorPrestacion(detalle.getValorNetaPresta())
                             .valorInteresesCesantias(detalle.getValorIntCesantias())
                             .tipoPrestacion(tipoPrestacion)
+                            .auxTransporte(detalle.getPromedioAuxTransporte() != null
+                                    ? detalle.getPromedioAuxTransporte()
+                                    : java.math.BigDecimal.ZERO)
+                            .cargoEmpleado(empleado != null ? empleado.cargoEmp() : "N/A")
                             .build();
                 })
                 .toList();

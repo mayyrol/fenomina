@@ -59,6 +59,9 @@ public class DetalleLiquiPrestacion {
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
 
+    @Column(name = "promedio_aux_transporte", precision = 12, scale = 2)
+    private BigDecimal promedioAuxTransporte;
+
     @PrePersist
     protected void onCreate() {
         this.createdAt = LocalDateTime.now();

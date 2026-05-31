@@ -97,4 +97,15 @@ public class NovedadController {
                 .toList();
         return ResponseEntity.ok(novedades);
     }
+
+    @GetMapping("/{id}")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'RRHH', 'CLIENTE_EMPRESA', 'AUDITOR')")
+    public ResponseEntity<NovedadResponseDTO> findById(
+            @PathVariable("id") Long id
+    ) {
+        log.debug("Consultando novedad: {}", id);
+        Novedad novedad = novedadService.findById(id);
+        List<ConceptoNominaDTO> conceptos = masterDataClient.findAllConceptosNomina();
+        return ResponseEntity.ok(mapper.toResponse(novedad, conceptos));
+    }
 }

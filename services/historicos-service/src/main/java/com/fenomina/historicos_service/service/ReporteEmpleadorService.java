@@ -109,14 +109,12 @@ public class ReporteEmpleadorService {
 
         log.debug("V7.1 - Seg social x empleado empresa={}", empresaId);
 
-        Page<Object[]> rawPage = reporteNominaDetalleRepository
-                .findDetallesPorConceptoIdsYEmpleado(
+        List<Object[]> rawList = reporteNominaDetalleRepository
+                .findDetallesPorConceptoIdsYEmpleadoSinPaginar(
                         empresaId, IDS_SEG_SOCIAL,
-                        anio, periodo, documento, nombres, pageable);
+                        anio, periodo, documento, nombres);
 
-        // [0] anio  [1] periodo  [2] documento  [3] nombres  [4] apellidos
-        // [5] fecha_ingreso  [6] fk_concep_nomina_id  [7] valor_result_concept
-        Map<String, List<Object[]>> porEmpleado = rawPage.getContent().stream()
+        Map<String, List<Object[]>> porEmpleado = rawList.stream()
                 .collect(Collectors.groupingBy(
                         row -> row[2] + "-" + toInteger(row[0]) + "-" + toInteger(row[1])
                 ));
@@ -149,7 +147,7 @@ public class ReporteEmpleadorService {
                 .sorted(Comparator.comparing(ReporteSegSocialXEmpleadoDTO::getApellidosEmp))
                 .collect(Collectors.toList());
 
-        return new PageImpl<>(dtos, pageable, rawPage.getTotalElements());
+        return paginar(dtos, pageable);
     }
 
     public Page<ReporteAportesParafTotalDTO> getAportesParafTotal(
@@ -210,12 +208,12 @@ public class ReporteEmpleadorService {
 
         log.debug("V8.1 - Aportes parafiscales x empleado empresa={}", empresaId);
 
-        Page<Object[]> rawPage = reporteNominaDetalleRepository
-                .findDetallesPorConceptoIdsYEmpleado(
+        List<Object[]> rawList = reporteNominaDetalleRepository
+                .findDetallesPorConceptoIdsYEmpleadoSinPaginar(
                         empresaId, IDS_PARAFISCALES,
-                        anio, periodo, documento, nombres, pageable);
+                        anio, periodo, documento, nombres);
 
-        Map<String, List<Object[]>> porEmpleado = rawPage.getContent().stream()
+        Map<String, List<Object[]>> porEmpleado = rawList.stream()
                 .collect(Collectors.groupingBy(
                         row -> row[2] + "-" + toInteger(row[0]) + "-" + toInteger(row[1])
                 ));
@@ -248,7 +246,7 @@ public class ReporteEmpleadorService {
                 .sorted(Comparator.comparing(ReporteAportesParafXEmpleadoDTO::getApellidosEmp))
                 .collect(Collectors.toList());
 
-        return new PageImpl<>(dtos, pageable, rawPage.getTotalElements());
+        return paginar(dtos, pageable);
     }
 
     public Page<ReporteCargasPrestTotalDTO> getCargasPrestacionalesTotal(
@@ -263,57 +261,70 @@ public class ReporteEmpleadorService {
 
         Page<Object[]> cesantiasPage = detalleLiquiPrestacionRepository
                 .findTotalesPrestacionesPorEmpresaYPeriodo(
-                        empresaId, "CESANTIAS_ANUAL", anio, periodo, pageable);
+                        empresaId, "CESANTIAS_ANUAL", anio, periodo, Pageable.unpaged());
 
         Page<Object[]> primasPage = detalleLiquiPrestacionRepository
                 .findTotalesPrestacionesPorEmpresaYPeriodo(
-                        empresaId, "PRIMA_SEMESTRAL", anio, periodo, pageable);
+                        empresaId, "PRIMA_SEMESTRAL", anio, periodo, Pageable.unpaged());
 
-        // Vacaciones: concepto IDs 2 y 3
-        List<Object[]> vacacionesRaw = reporteNominaDetalleRepository
-                .findTotalesPorConceptoIdsYPeriodo(
-                        empresaId,
-                        List.of(ConceptoNominaIds.VACACIONES_DISFRUTADAS,
-                                ConceptoNominaIds.VACACIONES_COMPENSADAS),
-                        anio, periodo);
-
-        Map<String, BigDecimal> vacacionesPorPeriodo = vacacionesRaw.stream()
-                .collect(Collectors.groupingBy(
-                        row -> toInteger(row[0]) + "-" + toInteger(row[1]),
-                        Collectors.reducing(BigDecimal.ZERO,
-                                row -> toBigDecimal(row[3]),
-                                BigDecimal::add)
-                ));
-
-        Map<String, Object[]> primasPorPeriodo = primasPage.getContent().stream()
+        Map<Integer, Object[]> cesantiasPorAnio = cesantiasPage.getContent().stream()
                 .collect(Collectors.toMap(
-                        row -> toInteger(row[0]) + "-" + toInteger(row[1]),
+                        row -> toInteger(row[0]),
                         row -> row,
                         (a, b) -> a
                 ));
+        Map<Integer, List<Object[]>> primasPorAnio = primasPage.getContent().stream()
+                .collect(Collectors.groupingBy(row -> toInteger(row[0])));
 
-        List<ReporteCargasPrestTotalDTO> resultado = cesantiasPage.getContent().stream()
-                .map(rowCes -> {
-                    Integer anioVal    = toInteger(rowCes[0]);
-                    Integer periodoVal = toInteger(rowCes[1]);
-                    String key = anioVal + "-" + periodoVal;
+        Set<Integer> aniosUnicos = new LinkedHashSet<>();
+        cesantiasPage.getContent().forEach(r -> aniosUnicos.add(toInteger(r[0])));
+        primasPage.getContent().forEach(r -> aniosUnicos.add(toInteger(r[0])));
 
-                    Object[] rowPrima = primasPorPeriodo.get(key);
+        List<ReporteCargasPrestTotalDTO> resultado = new ArrayList<>();
 
-                    return ReporteCargasPrestTotalDTO.builder()
+        for (Integer anioVal : aniosUnicos) {
+            Object[] rowCes = cesantiasPorAnio.get(anioVal);
+            List<Object[]> primasAnio = primasPorAnio.getOrDefault(
+                    anioVal, Collections.emptyList());
+
+            if (primasAnio.isEmpty()) {
+                resultado.add(ReporteCargasPrestTotalDTO.builder()
+                        .anio(anioVal)
+                        .periodo(rowCes != null ? toInteger(rowCes[1]) : null)
+                        .cargPresCesantiasInformativo(
+                                rowCes != null ? toBigDecimal(rowCes[3]) : BigDecimal.ZERO)
+                        .cargPresPrimas(BigDecimal.ZERO)
+                        .cargPresIntCesantias(
+                                rowCes != null ? toBigDecimal(rowCes[4]) : BigDecimal.ZERO)
+                        .build());
+            } else {
+                // Una fila por cada semestre de prima
+                for (Object[] rowPrima : primasAnio) {
+                    resultado.add(ReporteCargasPrestTotalDTO.builder()
                             .anio(anioVal)
-                            .periodo(periodoVal)
-                            .cargPresCesantiasInformativo(toBigDecimal(rowCes[3]))
-                            .cargPresPrimas(rowPrima != null
-                                    ? toBigDecimal(rowPrima[3]) : BigDecimal.ZERO)
-                            .cargPresVacaciones(vacacionesPorPeriodo
-                                    .getOrDefault(key, BigDecimal.ZERO))
-                            .cargPresIntCesantias(toBigDecimal(rowCes[4]))
-                            .build();
-                })
-                .collect(Collectors.toList());
+                            .periodo(toInteger(rowPrima[1]))
+                            .cargPresCesantiasInformativo(
+                                    rowCes != null ? toBigDecimal(rowCes[3]) : BigDecimal.ZERO)
+                            .cargPresPrimas(toBigDecimal(rowPrima[3]))
+                            .cargPresIntCesantias(
+                                    rowCes != null ? toBigDecimal(rowCes[4]) : BigDecimal.ZERO)
+                            .build());
+                }
+            }
+        }
+        resultado.sort(Comparator
+                .comparingInt(ReporteCargasPrestTotalDTO::getAnio).reversed()
+                .thenComparingInt(r -> r.getPeriodo() != null ? r.getPeriodo() : 0));
+        Collections.reverse(resultado); // compensar el thenComparing
+        resultado.sort((a, b) -> {
+            int cmpAnio = Integer.compare(b.getAnio(), a.getAnio());
+            if (cmpAnio != 0) return cmpAnio;
+            int pa = a.getPeriodo() != null ? a.getPeriodo() : 0;
+            int pb = b.getPeriodo() != null ? b.getPeriodo() : 0;
+            return Integer.compare(pb, pa);
+        });
 
-        return new PageImpl<>(resultado, pageable, cesantiasPage.getTotalElements());
+        return paginar(resultado, pageable);
     }
 
     public Page<ReporteConceptosEmpleadorTotalDTO> getConceptosEmpleadorTotal(
@@ -338,23 +349,9 @@ public class ReporteEmpleadorService {
                 .findTotalesPrestacionesPorEmpresaYPeriodo(
                         empresaId, "PRIMA_SEMESTRAL", anio, periodo, pageable);
 
-        List<Object[]> vacacionesRaw = reporteNominaDetalleRepository
-                .findTotalesPorConceptoIdsYPeriodo(
-                        empresaId,
-                        List.of(ConceptoNominaIds.VACACIONES_DISFRUTADAS,
-                                ConceptoNominaIds.VACACIONES_COMPENSADAS),
-                        anio, periodo);
 
         Map<String, Map<Long, BigDecimal>> aportesPorPeriodo =
                 agruparPorPeriodoYConcepto(todosAportesRaw);
-
-        Map<String, BigDecimal> vacacionesPorPeriodo = vacacionesRaw.stream()
-                .collect(Collectors.groupingBy(
-                        row -> toInteger(row[0]) + "-" + toInteger(row[1]),
-                        Collectors.reducing(BigDecimal.ZERO,
-                                row -> toBigDecimal(row[3]),
-                                BigDecimal::add)
-                ));
 
         Map<String, Object[]> primasPorPeriodo = primasPage.getContent().stream()
                 .collect(Collectors.toMap(
@@ -395,8 +392,6 @@ public class ReporteEmpleadorService {
                                     .totalAportesParafEmpr(sena.add(icbf).add(caja))
                                     .cargPresPrimas(rowPrima != null
                                             ? toBigDecimal(rowPrima[3]) : BigDecimal.ZERO)
-                                    .cargPresVacaciones(vacacionesPorPeriodo
-                                            .getOrDefault(key, BigDecimal.ZERO))
                                     .cargPresIntCesantias(toBigDecimal(rowCes[4]))
                                     .build();
                         })
