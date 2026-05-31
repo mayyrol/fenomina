@@ -95,7 +95,7 @@ public class ProcesoLiquidacionController {
         Long empresaIdUsuario = SecurityUtils.getCurrentUserEmpresaId();
 
         if ("CLIENTE_EMPRESA".equals(rol)) {
-            if (!proceso.getFkIdEmpresa().equals(empresaIdUsuario)) {
+            if (empresaIdUsuario == null || !proceso.getFkIdEmpresa().equals(empresaIdUsuario)) {
                 throw new AccessDeniedException("No tiene acceso a este proceso");
             }
         }

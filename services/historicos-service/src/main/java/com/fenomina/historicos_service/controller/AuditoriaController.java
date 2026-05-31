@@ -13,6 +13,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/historicos/auditoria")
@@ -42,7 +43,7 @@ public class AuditoriaController {
 
     @GetMapping("/sistema")
     @PreAuthorize("hasRole('SUPER_ADMIN')")
-    public ResponseEntity<Page<SystemAuditLogResponseDTO>> getSystemLogs(
+    public ResponseEntity<List<SystemAuditLogResponseDTO>> getSystemLogs(
             @RequestParam(required = false) Long usuarioId,
             @RequestParam(required = false) String username,
             @RequestParam(required = false) String tablaAfectada,
@@ -51,14 +52,11 @@ public class AuditoriaController {
             @RequestParam(required = false)
             @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime desde,
             @RequestParam(required = false)
-            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime hasta,
-            @RequestParam(defaultValue = "0")  int page,
-            @RequestParam(defaultValue = "20") int size) {
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime hasta) {
 
-        Pageable pageable = PageRequest.of(page, size);
         return ResponseEntity.ok(
                 auditoriaService.getSystemAuditLogs(
                         usuarioId, username, tablaAfectada,
-                        operacion, empresaId, desde, hasta, pageable));
+                        operacion, empresaId, desde, hasta));
     }
 }
