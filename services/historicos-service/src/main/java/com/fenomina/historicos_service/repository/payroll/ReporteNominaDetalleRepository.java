@@ -18,13 +18,18 @@ public interface ReporteNominaDetalleRepository extends JpaRepository<ReporteNom
 
     // Para V2
     @Query(value = """
-        SELECT
+
+            SELECT
             emp.documento_emp,
             emp.nombres_emp,
             emp.apellidos_emp,
-            emp.salario_basc_mensual,
-            nc.anio_cabec_nomina        AS anio,
-            nc.periodo_coti_nomina      AS periodo,
+            (SELECT rnd2.base_calculo_concept
+             FROM payroll.reporte_nomina_detalle rnd2
+             WHERE rnd2.fk_cabec_nomina_id = nc.cabec_nomina_id
+               AND rnd2.fk_concep_nomina_id = 1
+             LIMIT 1) AS salario_basc_mensual,
+            nc.anio_cabec_nomina AS anio,
+            nc.periodo_coti_nomina AS periodo,
             nc.total_devengado_emp,
             nc.total_deduccion_emp,
             nc.neto_nomina_emp,

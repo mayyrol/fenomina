@@ -11,7 +11,7 @@ public class JwtConfig {
     @Value("${jwt.secret}")
     private String secret;
 
-    @Value("${jwt.expiration:3600000}")
+    @Value("${jwt.expiration:7200000}")
     private Long expiration;
 
     public String getTokenHeader() {

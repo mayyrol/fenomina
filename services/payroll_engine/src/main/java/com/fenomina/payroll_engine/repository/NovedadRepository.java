@@ -53,4 +53,15 @@ public interface NovedadRepository extends JpaRepository<Novedad, Long> {
             @Param("periodo") Integer periodo
     );
 
+    @Query("SELECT n FROM Novedad n " +
+            "JOIN ProcesoLiquidacion p ON n.procesoLiquid = p.procesoLiquiId " +
+            "WHERE n.fkEmpleadoId = :empleadoId " +
+            "AND n.anio = :anio " +
+            "AND n.periodo = :periodo " +
+            "AND p.estadoProcNomina != 'ANULADO'")
+    List<Novedad> findByEmpleadoAnioPeriodoActivas(
+            @Param("empleadoId") Long empleadoId,
+            @Param("anio") Integer anio,
+            @Param("periodo") Integer periodo
+    );
 }

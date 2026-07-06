@@ -1,12 +1,10 @@
 spring.application.name=master-data-service
-# Configuración de la base de datos (PostgreSQL)
-# ip real 172.21.1.45 (?
-spring.datasource.url=jdbc:postgresql://127.0.0.1:5433/fendatabase
-spring.datasource.username=adminpg123
-spring.datasource.password=clavepg123
+
+spring.datasource.url=jdbc:postgresql://REEMPLAZAR_HOST:REEMPLAZAR_PUERTO/REEMPLAZAR_DBNAME
+spring.datasource.username=REEMPLAZAR_USUARIO
+spring.datasource.password=REEMPLAZAR_PASSWORD
 spring.datasource.driver-class-name=org.postgresql.Driver
 
-# Configuración de JPA / Hibernate
 spring.jpa.hibernate.ddl-auto=validate
 spring.jpa.show-sql=true
 spring.jpa.properties.hibernate.ejb.interceptor=org.hibernate.envers.event.EnversIntegrator
@@ -14,27 +12,26 @@ spring.jpa.properties.hibernate.default_schema=master_data
 spring.jpa.properties.hibernate.format_sql=true
 spring.jpa.open-in-view=false
 
-# Puerto del servicio
 server.port=8082
 
-# CONFIGURACIÓN JWT (antes: 1 hra -> 3600000)
-jwt.secret=wh5dSMFcOz9VnSE1mPyyc6PJbycLKODqRspjclNigC11zrYKPYgTv1WX6uil2r40SCJVtPS8Twy1P6MhiSJfewWUwXmVJttHVxAsRGxmLFC1HJYbHnoBFEOxswUL3lIo8tAUOBBnevGtJErxLjhz7LB9RrFxvLxZ
-jwt.expiration=900000
+jwt.secret=REEMPLAZAR_CON_CLAVE_ALEATORIA_LARGA
+jwt.expiration=7200000
 
-# Configuración de uploads
-file.upload.dir=C:/nomina-uploads/logos
+file.upload.dir=/app/uploads/logos
 file.upload.max-file-size=5242880
 file.upload.allowed-extensions=png,jpg,jpeg
 
-# Limites de archivos
 spring.servlet.multipart.enabled=true
 spring.servlet.multipart.max-file-size=5MB
 spring.servlet.multipart.max-request-size=5MB
+
+# API Key para comunicaciÃ³n interna entre servicios
+internal.api.key=REEMPLAZAR_CON_TU_API_KEY_INTERNA
 
 logging.level.root=INFO
 logging.level.com.fenomina.masterdata=DEBUG
 logging.level.org.springframework.web=DEBUG
 logging.level.org.springframework.security=DEBUG
 
-# API Key para comunicación interna entre servicios
-internal.api.key=fen-internal-key-2026
+management.endpoints.web.exposure.include=health
+management.endpoint.health.show-details=never

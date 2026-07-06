@@ -61,7 +61,8 @@ public class SeguridadSocialCalculator {
         // Grupo 6 (subtipo 6): salud va a subcuenta especial
         // Grupo 3 (subtipo 9): no cotiza salud
         // Tipo 23: no cotiza salud
-        if ("9".equals(subtipoCotizante) || "23".equals(tipoCotizante)) {
+        if ("9".equals(subtipoCotizante) || "CODIGO_9".equals(subtipoCotizante)
+                || "23".equals(tipoCotizante) || "ESTUDIANTE_SOLO_ARL".equals(tipoCotizante)) {
             return aportes;
         }
 
@@ -215,7 +216,8 @@ public class SeguridadSocialCalculator {
         // Tipo 23: ARL siempre sobre 1 SMMLV
         // Tipo 51: ARL siempre sobre 1 SMMLV por 30 días completos
         BigDecimal baseArl;
-        if ("23".equals(tipoCotizante) || "51".equals(tipoCotizante)) {
+        if ("23".equals(tipoCotizante) || "ESTUDIANTE_SOLO_ARL".equals(tipoCotizante)
+                || "51".equals(tipoCotizante) || "TIEMPO_PARCIAL".equals(tipoCotizante)) {
             baseArl = ctx.getParametrosPorNombre()
                     .get("SMMLV").valorParamGeneral();
         } else {
@@ -251,10 +253,10 @@ public class SeguridadSocialCalculator {
 
         // Tipos sin parafiscales: independientes, aprendiz lectiva,
         // estudiante solo ARL, licencia mat/pat
-        if ("03".equals(tipoCotizante)
-                || "59".equals(tipoCotizante)
-                || "12".equals(tipoCotizante)
-                || "23".equals(tipoCotizante)) {
+        if ("03".equals(tipoCotizante) || "INDEPENDIENTE".equals(tipoCotizante)
+                || "59".equals(tipoCotizante) || "INDEPENDIENTE_PRESTACION_SERVICIOS".equals(tipoCotizante)
+                || "12".equals(tipoCotizante) || "APRENDIZ_SENA_LECTIVA".equals(tipoCotizante)
+                || "23".equals(tipoCotizante) || "ESTUDIANTE_SOLO_ARL".equals(tipoCotizante)) {
             return aportes;
         }
 
@@ -267,7 +269,7 @@ public class SeguridadSocialCalculator {
                 && totalDevengadoSalarial.compareTo(smmlv.multiply(DIEZ_SMMLV)) < 0;
 
         // Tipo 20 (estudiante Ley 789): exento de SENA e ICBF por ley
-        boolean estudianteLey789 = "20".equals(tipoCotizante);
+        boolean estudianteLey789 = "20".equals(tipoCotizante) || "ESTUDIANTE_LEY_789".equals(tipoCotizante);
 
         BigDecimal porcentajeCcf = ctx.getParametrosPorNombre()
                 .get("CAJA_COMPENSACION").porcentajeParamGeneral();

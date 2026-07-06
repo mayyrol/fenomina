@@ -71,7 +71,8 @@ public class DeduccionesCalculator {
 
         // --- Fondo de solidaridad pensional ---
         if (ibc.isCotizaPension()) {
-            BigDecimal fspPorcentaje = calcularPorcentajeFsp(ctx, ibc.getIbcPension());
+            BigDecimal salarioBase = ctx.getEmpleado().salarioBascMensual();
+            BigDecimal fspPorcentaje = calcularPorcentajeFsp(ctx, salarioBase);
 
             if (fspPorcentaje.compareTo(BigDecimal.ZERO) > 0) {
                 BigDecimal valorFsp = ibc.getIbcPension()
@@ -90,12 +91,13 @@ public class DeduccionesCalculator {
 
         // Subtipo 6: cotiza FSP sobre IBC salud SOLO si no cotiza pensión
         // (evita duplicar la deducción cuando ibc.isCotizaPension() ya lo calculó)
-        if ("6".equals(subtipo) && !ibc.isCotizaPension()) {
+        if (("6".equals(subtipo) || "CODIGO_6".equals(subtipo)) && !ibc.isCotizaPension()) {
             BigDecimal smmlv = ctx.getParametrosPorNombre()
                     .get("SMMLV").valorParamGeneral();
             BigDecimal cuatroSmmlv = smmlv.multiply(BigDecimal.valueOf(4));
-            if (ibc.getIbcSalud().compareTo(cuatroSmmlv) >= 0) {
-                BigDecimal fspPorcentaje = calcularPorcentajeFsp(ctx, ibc.getIbcSalud());
+            BigDecimal salarioBase = ctx.getEmpleado().salarioBascMensual();
+            if (salarioBase.compareTo(cuatroSmmlv) >= 0) {
+                BigDecimal fspPorcentaje = calcularPorcentajeFsp(ctx, salarioBase);
                 if (fspPorcentaje.compareTo(BigDecimal.ZERO) > 0) {
                     BigDecimal valorFsp = ibc.getIbcSalud()
                             .multiply(fspPorcentaje)

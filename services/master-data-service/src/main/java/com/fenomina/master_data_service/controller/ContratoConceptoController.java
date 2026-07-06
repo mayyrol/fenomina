@@ -1,9 +1,11 @@
 package com.fenomina.master_data_service.controller;
 
 import com.fenomina.master_data_service.dto.request.ContratoConceptoRequestDTO;
+import com.fenomina.master_data_service.dto.response.ConceptoNominaInternalDTO;
 import com.fenomina.master_data_service.dto.response.ConceptoNominaResponseDTO;
 import com.fenomina.master_data_service.dto.response.ContratoConceptoResponseDTO;
 import com.fenomina.master_data_service.repository.ConceptoNominaRepository;
+import com.fenomina.master_data_service.service.ConceptoNominaInternalService;
 import com.fenomina.master_data_service.service.ContratoConceptoService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -23,6 +25,7 @@ public class ContratoConceptoController {
 
     private final ContratoConceptoService contratoConceptoService;
     private final ConceptoNominaRepository conceptoNominaRepository;
+    private final ConceptoNominaInternalService conceptoNominaInternalService;
 
     @PostMapping("/contratos-concepto")
     @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'RRHH')")
@@ -97,5 +100,11 @@ public class ContratoConceptoController {
         log.info("Solicitud de actualización de contrato concepto ID: {}", id);
         ContratoConceptoResponseDTO response = contratoConceptoService.update(id, request);
         return ResponseEntity.ok(response);
+    }
+
+    @GetMapping("/conceptos-nomina/novedades")
+    public ResponseEntity<List<ConceptoNominaInternalDTO>> findConceptosParaNovedades() {
+        log.debug("Consultando catálogo de conceptos de nómina para formulario de novedades");
+        return ResponseEntity.ok(conceptoNominaInternalService.findAll());
     }
 }

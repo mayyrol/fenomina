@@ -40,7 +40,26 @@ public class NovedadServiceImpl implements NovedadService {
             "Otro concepto a devenir salarial",
             "Otro concepto a devenir no salarial",
             "Otros conceptos a deducir salariales",
-            "Otros conceptos a deducir no salariales"
+            "Otros conceptos a deducir no salariales",
+
+            "Beneficios o extralegales no salariales",
+            "Comisiones",
+            "Bonificaciones ocasionales o por mera liberalidad",
+            "Vacaciones disfrutadas",
+            "Vacaciones compensadas en dinero",
+            "Incapacidad por enfermedad general",
+            "Incapacidad por origen laboral",
+            "Licencia de maternidad",
+            "Licencia de paternidad",
+            "Licencia por calamidad doméstica",
+            "Licencia por matrimonio",
+            "Licencia Ley ISAAC",
+            "Licencia por sufragio",
+            "Cargos transitorios",
+            "Citaciones judiciales",
+            "Otros permisos remunerados pactados",
+            "Licencias no remuneradas",
+            "Retención en la fuente"
     );
 
     @Override
@@ -180,18 +199,28 @@ public class NovedadServiceImpl implements NovedadService {
     private void completarDiasDesdeFechas(Novedad novedad) {
         if (novedad.getCantidadDiasNovedad() != null
                 && novedad.getCantidadDiasNovedad() > 0) {
-            return; // Ya viene calculado, no sobrescribir
+            return;
         }
 
         if (novedad.getFechaInicioAusen() != null
                 && novedad.getFechaFinAusen() != null) {
-            long dias = java.time.temporal.ChronoUnit.DAYS.between(
-                    novedad.getFechaInicioAusen(),
-                    novedad.getFechaFinAusen()
-            ) + 1;
-            if (dias > 30) {
-                dias = 30;
-            }
+
+            java.time.LocalDate inicio = novedad.getFechaInicioAusen();
+            java.time.LocalDate fin    = novedad.getFechaFinAusen();
+
+            int diaInicio = Math.min(inicio.getDayOfMonth(), 30);
+            int ultimoDiaMesFin = inicio.getMonth().length(
+                    java.time.Year.isLeap(fin.getYear()));
+            int diaFin = fin.getDayOfMonth() == ultimoDiaMesFin
+                    ? 30
+                    : Math.min(fin.getDayOfMonth(), 30);
+
+            long meses = (fin.getYear() - inicio.getYear()) * 12L
+                    + (fin.getMonthValue() - inicio.getMonthValue());
+
+            long dias = meses * 30 + (diaFin - diaInicio) + 1;
+
+            if (dias > 30) dias = 30;
 
             novedad.setCantidadDiasNovedad((int) dias);
         }

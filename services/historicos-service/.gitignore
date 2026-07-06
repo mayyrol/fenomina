@@ -29,5 +29,11 @@ build/
 !**/src/main/**/build/
 !**/src/test/**/build/
 
-### VS Code ###
-.vscode/
+# Credenciales
+**/application.properties
+**/application.yml
+application.properties
+application.yml
+
+# OS
+.DS_Store

@@ -49,3 +49,12 @@ application-local.yml
 *.p12
 *.key
 *.pem
+
+# Credenciales
+**/application.properties
+**/application.yml
+application.properties
+application.yml
+
+# OS
+.DS_Store

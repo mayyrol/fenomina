@@ -76,6 +76,14 @@ public class DesprendibleController {
                     List<ReporteNominaDetalle> detalles = reporteNominaDetalleRepository
                             .findByFkCabecNominaId(cabecera.getCabecNominaId());
 
+                    BigDecimal salarioHistorico = detalles.stream()
+                            .filter(d -> d.getFkConcepNominaId() != null
+                                    && d.getFkConcepNominaId().equals(1L))
+                            .map(ReporteNominaDetalle::getBaseCalculoConcept)
+                            .filter(v -> v != null)
+                            .findFirst()
+                            .orElse(empleado != null ? empleado.salarioBascMensual() : null);
+
                     String advertenciaNoSalarial = null;
                     if (empleado != null) {
                         // Calcular exceso no salarial real
@@ -155,8 +163,7 @@ public class DesprendibleController {
                                     ? empleado.apellidosEmp() : "N/A")
                             .documentoEmpleado(empleado != null
                                     ? empleado.documentoEmp() : "N/A")
-                            .salarioBasico(empleado != null
-                                    ? empleado.salarioBascMensual() : null)
+                            .salarioBasico(salarioHistorico)
                             .anio(cabecera.getAnioCabecNomina())
                             .fechaInicioCorteEmpleado(fechaInicioCorteEmpleado)
                             .periodo(cabecera.getPeriodoCotiNomina())

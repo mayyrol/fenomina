@@ -11,7 +11,7 @@ import java.util.List;
 
 @FeignClient(
         name = "master-data-service",
-        url = "${services.master-data.url}"
+        url = "${services.masterdata.url}"
 )
 public interface MasterDataClient {
 

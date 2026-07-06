@@ -1,19 +1,13 @@
 package com.fenomina.payroll_engine.service.liquidacion;
 
-import com.fenomina.payroll_engine.entity.CabeceraLiquiPrestacion;
-import com.fenomina.payroll_engine.entity.DetalleLiquiPrestacion;
-import com.fenomina.payroll_engine.entity.NominaCabecera;
-import com.fenomina.payroll_engine.entity.ProcesoLiquidacion;
+import com.fenomina.payroll_engine.entity.*;
 import com.fenomina.payroll_engine.enums.EstadoProceso;
 import com.fenomina.payroll_engine.exception.CalculoNominaException;
 import com.fenomina.payroll_engine.client.MasterDataClientWrapper;
 import com.fenomina.payroll_engine.client.dto.ConceptoNominaDTO;
 import com.fenomina.payroll_engine.client.dto.EmpleadoDTO;
 import com.fenomina.payroll_engine.client.dto.ParametroGeneralDTO;
-import com.fenomina.payroll_engine.repository.CabeceraLiquiPrestacionRepository;
-import com.fenomina.payroll_engine.repository.DetalleLiquiPrestacionRepository;
-import com.fenomina.payroll_engine.repository.NominaCabeceraRepository;
-import com.fenomina.payroll_engine.repository.ReporteNominaDetalleRepository;
+import com.fenomina.payroll_engine.repository.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -34,12 +28,47 @@ public class LiquidacionPrimaServiceImpl implements LiquidacionPrimaService {
     private static final int ESCALA = 2;
     private static final int DIAS_SEMESTRE = 180;
     private static final int DIAS_ANIO = 360;
+    // IDs de conceptos que cuentan para días base de prima/cesantías
+    private static final java.util.Set<Long> IDS_DIAS_BASE = java.util.Set.of(
+            1L,   // Salario días trabajados
+            2L,   // Vacaciones disfrutadas
+            4L,   // Incapacidad por enfermedad general
+            5L,   // Incapacidad por origen laboral
+            6L,   // Licencia de maternidad
+            7L,   // Licencia de paternidad
+            8L,   // Licencia por calamidad doméstica
+            9L,   // Licencia por matrimonio
+            10L,  // Licencia Ley ISAAC
+            11L,  // Licencia por sufragio
+            12L,  // Cargos transitorios
+            13L,  // Citaciones judiciales
+            14L   // Otros permisos remunerados pactados
+            // 15L excluido: Licencias no remuneradas
+            // 3L excluido: Vacaciones compensadas en dinero (pago, no días)
+    );
+
+    private static final java.util.Set<Long> IDS_AUSENCIAS = java.util.Set.of(
+            2L,   // Vacaciones disfrutadas
+            4L,   // Incapacidad por enfermedad general
+            5L,   // Incapacidad por origen laboral
+            6L,   // Licencia de maternidad
+            7L,   // Licencia de paternidad
+            8L,   // Licencia por calamidad doméstica
+            9L,   // Licencia por matrimonio
+            10L,  // Licencia Ley ISAAC
+            11L,  // Licencia por sufragio
+            12L,  // Cargos transitorios
+            13L,  // Citaciones judiciales
+            14L,  // Otros permisos remunerados pactados
+            15L   // Licencias no remuneradas
+    );
 
     private final MasterDataClientWrapper masterDataClient;
     private final NominaCabeceraRepository nominaCabeceraRepository;
     private final ReporteNominaDetalleRepository reporteNominaDetalleRepository;
     private final CabeceraLiquiPrestacionRepository cabeceraLiquiPrestacionRepository;
     private final DetalleLiquiPrestacionRepository detalleLiquiPrestacionRepository;
+    private final NovedadRepository novedadRepository;
 
     @Override
     @Transactional
@@ -52,6 +81,16 @@ public class LiquidacionPrimaServiceImpl implements LiquidacionPrimaService {
 
         Map<String, ConceptoNominaDTO> conceptosPorNombre = todosConceptos.stream()
                 .collect(Collectors.toMap(ConceptoNominaDTO::nombreConcepNomina, c -> c));
+
+        java.util.Set<Long> idsNoSalariales = java.util.stream.Stream.of(
+                        "Beneficios o extralegales no salariales",
+                        "Otro concepto a devenir no salarial",
+                        "Otros pagos que no constituyen salario permanente",
+                        "Bonificaciones ocasionales o por mera liberalidad"
+                ).map(nombre -> conceptosPorNombre.get(nombre))
+                .filter(c -> c != null)
+                .map(ConceptoNominaDTO::concepNominaId)
+                .collect(java.util.stream.Collectors.toSet());
 
         LocalDate fechaFin = proceso.getFechaFinPeriodo();
         LocalDate fechaInicio = proceso.getFechaInicioPeriodo();
@@ -88,7 +127,8 @@ public class LiquidacionPrimaServiceImpl implements LiquidacionPrimaService {
                         smmlv,
                         auxTransporte,
                         conceptosPorNombre,
-                        todosParametros
+                        todosParametros,
+                        idsNoSalariales
                 );
             } catch (Exception e) {
                 log.error("Error liquidando prima empleado {}: {}", empleadoId, e.getMessage());
@@ -112,7 +152,8 @@ public class LiquidacionPrimaServiceImpl implements LiquidacionPrimaService {
             BigDecimal smmlv,
             BigDecimal auxTransporte,
             Map<String, ConceptoNominaDTO> conceptosPorNombre,
-            List<ParametroGeneralDTO> todosParametros
+            List<ParametroGeneralDTO> todosParametros,
+            java.util.Set<Long> idsNoSalariales
     ) {
         EmpleadoDTO empleado = empleadosPorId.get(empleadoId);
         if (empleado == null) {
@@ -142,7 +183,7 @@ public class LiquidacionPrimaServiceImpl implements LiquidacionPrimaService {
                         EstadoProceso.PAGADO
                 );
 
-        // Días laborados: suma de cantidad_concept del concepto salario (ID=1)
+        // Días laborados: suma de cantidad_concept
         int diasLiquidados;
         if (!nominasSemestre.isEmpty()) {
             diasLiquidados = nominasSemestre.stream()
@@ -150,7 +191,7 @@ public class LiquidacionPrimaServiceImpl implements LiquidacionPrimaService {
                             .findByFkCabecNominaId(nc.getCabecNominaId())
                             .stream()
                             .filter(d -> d.getFkConcepNominaId() != null &&
-                                    d.getFkConcepNominaId().equals(1L))
+                                    IDS_DIAS_BASE.contains(d.getFkConcepNominaId()))
                             .mapToInt(d -> d.getCantidadConcept() != null
                                     ? d.getCantidadConcept().intValue() : 0)
                             .sum())
@@ -161,9 +202,13 @@ public class LiquidacionPrimaServiceImpl implements LiquidacionPrimaService {
             diasLiquidados = Math.min(diasLiquidados, DIAS_SEMESTRE);
         }
 
-        // Calcular base y aux promedio
+        int diasCalendarioVinculado = LiquidacionFechaUtils.calcularDias(fechaInicioReal, fechaFinPeriodo);
+        diasCalendarioVinculado = Math.min(diasCalendarioVinculado, DIAS_SEMESTRE);
+
+        // Calcular base y aux promedio pasándole diasCalendarioVinculado
         BigDecimal[] resultado = calcularBaseYAux(
-                nominasSemestre, empleado, periodoInicio, periodoFin);
+                nominasSemestre, empleado, periodoInicio, periodoFin,
+                idsNoSalariales, auxTransporte, diasLiquidados, diasCalendarioVinculado);
         BigDecimal baseLiquidacion = resultado[0];
         BigDecimal auxPromedio = resultado[1];
         BigDecimal salarioPromedio = baseLiquidacion.subtract(auxPromedio);
@@ -202,7 +247,11 @@ public class LiquidacionPrimaServiceImpl implements LiquidacionPrimaService {
             List<NominaCabecera> nominas,
             EmpleadoDTO empleado,
             int periodoInicio,
-            int periodoFin
+            int periodoFin,
+            java.util.Set<Long> idsNoSalariales,
+            BigDecimal auxTransporteCompleto,
+            int diasLiquidados,
+            int diasCalendarioVinculado
     ) {
         if (nominas.isEmpty()) {
             return new BigDecimal[]{
@@ -211,55 +260,142 @@ public class LiquidacionPrimaServiceImpl implements LiquidacionPrimaService {
             };
         }
 
-        // Agrupar por período (mes) para manejar quincenales
-        Map<Integer, BigDecimal> devengadoPorMes = new java.util.LinkedHashMap<>();
-        Map<Integer, BigDecimal> auxPorMes = new java.util.LinkedHashMap<>();
+        boolean empleadoTieneAux = Boolean.TRUE.equals(empleado.tieneAuxTransporte());
+
+        BigDecimal totalDevengadoAcumulado = BigDecimal.ZERO;
+        BigDecimal totalAuxAcumuladoSinNovedades = BigDecimal.ZERO;
+        BigDecimal totalAuxAcumuladoConNovedades = BigDecimal.ZERO;
+        java.util.Set<Integer> todosMesesConNomina = new java.util.HashSet<>();
 
         for (NominaCabecera nc : nominas) {
             int mes = nc.getPeriodoCotiNomina();
 
-            // Solo meses dentro del semestre
             if (mes < periodoInicio || mes > periodoFin) continue;
 
-            // Sumar total devengado por mes
-            devengadoPorMes.merge(mes,
-                    nc.getTotalDevengadoEmp() != null
-                            ? nc.getTotalDevengadoEmp() : BigDecimal.ZERO,
-                    BigDecimal::add);
+            todosMesesConNomina.add(mes);
 
-            // Sumar aux transporte del mes desde reporte_nomina_detalle
-            BigDecimal auxMes = reporteNominaDetalleRepository
-                    .findByFkCabecNominaId(nc.getCabecNominaId())
-                    .stream()
-                    .filter(d -> d.getFkConcepNominaId() != null
-                            && d.getFkConcepNominaId().equals(22L))
-                    .map(d -> d.getValorResultConcept() != null
-                            ? d.getValorResultConcept() : BigDecimal.ZERO)
-                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+            List<com.fenomina.payroll_engine.entity.ReporteNominaDetalle> detalles =
+                    reporteNominaDetalleRepository.findByFkCabecNominaId(nc.getCabecNominaId());
 
-            auxPorMes.merge(mes, auxMes, BigDecimal::add);
+            List<com.fenomina.payroll_engine.entity.Novedad> novedadesMes = novedadRepository
+                    .findByEmpleadoAnioPeriodoActivas(
+                            empleado.empleadoId(), nc.getAnioCabecNomina(), mes);
+
+            boolean sinNovedades = novedadesMes.isEmpty();
+            boolean soloNovedadesNoSalariales = !novedadesMes.isEmpty()
+                    && novedadesMes.stream()
+                    .allMatch(n -> idsNoSalariales.contains(n.getFkConcepNominaId()));
+
+            boolean aplicaSalarioBase = sinNovedades || soloNovedadesNoSalariales;
+
+            if (aplicaSalarioBase) {
+                int diasDelProceso = detalles.stream()
+                        .filter(d -> d.getFkConcepNominaId() != null
+                                && d.getFkConcepNominaId().equals(1L))
+                        .mapToInt(d -> d.getCantidadConcept() != null
+                                ? d.getCantidadConcept().intValue() : 0)
+                        .sum();
+
+                BigDecimal salarioHistoricoMes = detalles.stream()
+                        .filter(d -> d.getFkConcepNominaId() != null
+                                && d.getFkConcepNominaId().equals(1L))
+                        .map(com.fenomina.payroll_engine.entity.ReporteNominaDetalle::getBaseCalculoConcept)
+                        .filter(v -> v != null)
+                        .findFirst()
+                        .orElse(empleado.salarioBascMensual());
+
+                boolean tuvoAuxEsteProceso = detalles.stream()
+                        .anyMatch(d -> d.getFkConcepNominaId() != null
+                                && d.getFkConcepNominaId().equals(22L));
+
+                BigDecimal auxCompleto = (empleadoTieneAux && tuvoAuxEsteProceso)
+                        ? auxTransporteCompleto : BigDecimal.ZERO;
+
+                BigDecimal factor = BigDecimal.valueOf(diasDelProceso)
+                        .divide(BigDecimal.valueOf(30), 10, RoundingMode.HALF_UP);
+
+                totalDevengadoAcumulado = totalDevengadoAcumulado
+                        .add(salarioHistoricoMes.multiply(factor));
+
+                totalAuxAcumuladoSinNovedades = totalAuxAcumuladoSinNovedades
+                        .add(auxCompleto.multiply(factor));
+
+            } else {
+                BigDecimal devengadoProceso = nc.getTotalDevengadoEmp() != null
+                        ? nc.getTotalDevengadoEmp() : BigDecimal.ZERO;
+
+                BigDecimal noSalarialProceso = detalles.stream()
+                        .filter(d -> d.getFkConcepNominaId() != null
+                                && idsNoSalariales.contains(d.getFkConcepNominaId()))
+                        .map(d -> d.getValorResultConcept() != null
+                                ? d.getValorResultConcept() : BigDecimal.ZERO)
+                        .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+                BigDecimal auxProceso = detalles.stream()
+                        .filter(d -> d.getFkConcepNominaId() != null
+                                && d.getFkConcepNominaId().equals(22L))
+                        .map(d -> d.getValorResultConcept() != null
+                                ? d.getValorResultConcept() : BigDecimal.ZERO)
+                        .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+                totalDevengadoAcumulado = totalDevengadoAcumulado
+                        .add(devengadoProceso.subtract(noSalarialProceso).subtract(auxProceso));
+
+                // Verificar si este proceso tuvo novedades de ausencia
+                // (únicas que reducen el aux de transporte)
+                boolean tuvoAusencia = novedadesMes.stream()
+                        .anyMatch(n -> IDS_AUSENCIAS.contains(n.getFkConcepNominaId()));
+
+                if (tuvoAusencia) {
+                    // Aux real reducido por ausencia → acumular para promediar entre meses
+                    totalAuxAcumuladoConNovedades = totalAuxAcumuladoConNovedades.add(auxProceso);
+                } else {
+                    // Sin ausencias → aux completo, tratarlo igual que rama sin novedades
+                    boolean tuvoAuxEsteProceso = detalles.stream()
+                            .anyMatch(d -> d.getFkConcepNominaId() != null
+                                    && d.getFkConcepNominaId().equals(22L));
+                    BigDecimal auxCompleto = (empleadoTieneAux && tuvoAuxEsteProceso)
+                            ? auxTransporteCompleto : BigDecimal.ZERO;
+                    int diasDelProceso = detalles.stream()
+                            .filter(d -> d.getFkConcepNominaId() != null
+                                    && d.getFkConcepNominaId().equals(1L))
+                            .mapToInt(d -> d.getCantidadConcept() != null
+                                    ? d.getCantidadConcept().intValue() : 0)
+                            .sum();
+                    BigDecimal factor = BigDecimal.valueOf(diasDelProceso)
+                            .divide(BigDecimal.valueOf(30), 10, RoundingMode.HALF_UP);
+                    totalAuxAcumuladoSinNovedades = totalAuxAcumuladoSinNovedades
+                            .add(auxCompleto.multiply(factor));
+                }
+            }
         }
 
-        int mesesConNomina = devengadoPorMes.size();
-        if (mesesConNomina == 0) {
+        if (diasLiquidados <= 0) {
             return new BigDecimal[]{empleado.salarioBascMensual(), BigDecimal.ZERO};
         }
 
-        BigDecimal sumaDevengados = devengadoPorMes.values().stream()
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
-        BigDecimal sumaAux = auxPorMes.values().stream()
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal promedioMensualSalario = totalDevengadoAcumulado
+                .divide(BigDecimal.valueOf(diasLiquidados), 10, RoundingMode.HALF_UP)
+                .multiply(BigDecimal.valueOf(30))
+                .setScale(ESCALA, RoundingMode.HALF_UP);
 
-        BigDecimal divisor = BigDecimal.valueOf(mesesConNomina);
+        int totalMeses = todosMesesConNomina.isEmpty() ? 1 : todosMesesConNomina.size();
 
-        BigDecimal baseLiquidacion = sumaDevengados
-                .divide(divisor, ESCALA, RoundingMode.HALF_UP);
-        BigDecimal auxPromedio = sumaAux
-                .divide(divisor, ESCALA, RoundingMode.HALF_UP);
+        BigDecimal promedioAuxSinNovedades = totalAuxAcumuladoSinNovedades
+                .divide(BigDecimal.valueOf(diasLiquidados), 10, RoundingMode.HALF_UP)
+                .multiply(BigDecimal.valueOf(30))
+                .setScale(ESCALA, RoundingMode.HALF_UP);
 
-        return new BigDecimal[]{baseLiquidacion, auxPromedio};
+        BigDecimal promedioAuxConNovedades = totalAuxAcumuladoConNovedades
+                .divide(BigDecimal.valueOf(totalMeses), ESCALA, RoundingMode.HALF_UP);
+
+        BigDecimal promedioMensualAux = promedioAuxSinNovedades.add(promedioAuxConNovedades);
+
+        return new BigDecimal[]{
+                promedioMensualSalario.add(promedioMensualAux),
+                promedioMensualAux
+        };
     }
-
     // --- Helpers ---
 
     private BigDecimal resolverValorParametro(

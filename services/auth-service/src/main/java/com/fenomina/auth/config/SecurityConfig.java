@@ -52,6 +52,7 @@ public class SecurityConfig {
                                 "/auth/login",
                                 "/auth/refresh",
                                 "/auth/logout",
+                                "/actuator/health",
                                 "/error"
                         ).permitAll()
 

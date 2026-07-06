@@ -35,23 +35,23 @@ public class IBCCalculator {
         String subtipoCotizante = ctx.getEmpleado().subtipoCotizante();
 
         return switch (tipoCotizante) {
-            case "01", "02", "19", "20", "44", "45" ->
-                    calcularDependienteEstandar(ctx, totalDevengadoSalarial, subtipoCotizante);
-            case "12" ->
-                    calcularAprendizLectiva(ctx, totalDevengadoSalarial);
-            case "23" ->
-                    calcularEstudianteSoloArl(ctx);
-            case "03" ->
-                    calcularIndependiente(ctx, totalDevengadoSalarial, subtipoCotizante, false);
-            case "59" ->
-                    calcularIndependiente(ctx, totalDevengadoSalarial, subtipoCotizante, true);
-            case "51" ->
-                    calcularTiempoParcial(ctx, totalDevengadoSalarial, subtipoCotizante);
-            default ->
-                    calcularDependienteEstandar(ctx, totalDevengadoSalarial, subtipoCotizante);
+            case "01", "02", "19", "20", "44", "45",
+                 "DEPENDIENTE", "SERVICIO_DOMESTICO", "APRENDIZ_SENA_PRODUCTIVA",
+                 "ESTUDIANTE_LEY_789", "COTIZANTE_EMERGENCIA_1", "COTIZANTE_EMERGENCIA_2"
+                    -> calcularDependienteEstandar(ctx, totalDevengadoSalarial, subtipoCotizante);
+            case "12", "APRENDIZ_SENA_LECTIVA"
+                    -> calcularAprendizLectiva(ctx, totalDevengadoSalarial);
+            case "23", "ESTUDIANTE_SOLO_ARL"
+                    -> calcularEstudianteSoloArl(ctx);
+            case "03", "INDEPENDIENTE"
+                    -> calcularIndependiente(ctx, totalDevengadoSalarial, subtipoCotizante, false);
+            case "59", "INDEPENDIENTE_PRESTACION_SERVICIOS"
+                    -> calcularIndependiente(ctx, totalDevengadoSalarial, subtipoCotizante, true);
+            case "51", "TIEMPO_PARCIAL"
+                    -> calcularTiempoParcial(ctx, totalDevengadoSalarial, subtipoCotizante);
+            default -> calcularDependienteEstandar(ctx, totalDevengadoSalarial, subtipoCotizante);
         };
     }
-
     // --- Grupo 1: Dependiente estándar ---
 
     private IBCCalculado calcularDependienteEstandar(
@@ -167,7 +167,8 @@ public class IBCCalculator {
         boolean cotizaPension = cotizaPension(subtipoCotizante);
 
         // Subtipo 11: conductor taxi, ARL clase IV obligatoria
-        boolean esArlObligatoria = arlObligatoria || "11".equals(subtipoCotizante);
+        boolean esArlObligatoria = arlObligatoria ||
+                "11".equals(subtipoCotizante) || "CODIGO_11".equals(subtipoCotizante);
 
         return IBCCalculado.builder()
                 .ibcSalud(ibc)
@@ -205,11 +206,11 @@ public class IBCCalculator {
         BigDecimal baseParafiscales = calcularBaseParafiscales(ctx, totalDevengadoSalarial);
 
         return IBCCalculado.builder()
-                .ibcSalud(ibcProporcional)
+                .ibcSalud(BigDecimal.ZERO)
                 .ibcPension(cotizaPension ? ibcProporcional : BigDecimal.ZERO)
                 .ibcArl(smmlv) // Siempre 1 SMMLV completo para ARL tipo 51
                 .ibcParafiscales(baseParafiscales)
-                .cotizaSalud(true)
+                .cotizaSalud(false)
                 .cotizaPension(cotizaPension)
                 .cotizaArl(true)
                 .build();
@@ -278,14 +279,16 @@ public class IBCCalculator {
     private boolean cotizaPension(String subtipoCotizante) {
         if (subtipoCotizante == null) return true;
         return switch (subtipoCotizante) {
-            case "1", "3", "4", "5", "9", "12" -> false;
+            case "1", "3", "4", "5", "9", "12",
+                 "CODIGO_1", "CODIGO_3", "CODIGO_4", "CODIGO_5", "CODIGO_9", "CODIGO_12"
+                    -> false;
             default -> true;
         };
     }
 
     private boolean cotizaSalud(String subtipoCotizante) {
         if (subtipoCotizante == null) return true;
-        return !"9".equals(subtipoCotizante);
+        return !"9".equals(subtipoCotizante) && !"CODIGO_9".equals(subtipoCotizante);
     }
 
     private BigDecimal calcularExcesoNoSalarial(ContextoLiquidacion ctx) {

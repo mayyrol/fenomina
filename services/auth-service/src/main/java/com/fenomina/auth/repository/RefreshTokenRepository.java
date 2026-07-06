@@ -8,6 +8,7 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -31,6 +32,23 @@ public interface RefreshTokenRepository extends JpaRepository<RefreshToken, UUID
 
     @Query("SELECT COUNT(rt) FROM RefreshToken rt WHERE rt.usuario.usuarioId = :usuarioId AND rt.revoked = false")
     long countActiveTokensByUsuario(@Param("usuarioId") Long usuarioId);
+
+    @Transactional
+    @Modifying
+    @Query("""
+    DELETE FROM RefreshToken rt
+    WHERE rt.usuario.usuarioId IN (
+        SELECT u.usuarioId FROM Usuario u
+        WHERE u.deletedAt IS NOT NULL
+        AND u.deletedAt < :limite
+    )
+    """)
+    int deleteTokensForDeletedUsers(@Param("limite") LocalDateTime limite);
+
+    @Transactional
+    @Modifying
+    @Query("DELETE FROM RefreshToken rt WHERE rt.revoked = true AND rt.createdAt < :limite")
+    int deleteRevokedTokensOlderThan(@Param("limite") LocalDateTime limite);
 
     //Query optimizado para obtener el token mas antiguo
     @Query("""

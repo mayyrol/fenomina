@@ -64,6 +64,7 @@ public class ProcesoLiquidacionServiceImpl implements ProcesoLiquidacionService 
             LocalDate fechaInicio,
             LocalDate fechaFin
     ) {
+
         // Detectar automáticamente si es quincenal o mensual según días del periodo
         if (tipoProceso == TipoProceso.NOMINA_MENSUAL ||
                 tipoProceso == TipoProceso.NOMINA_QUINCENAL) {
@@ -81,9 +82,16 @@ public class ProcesoLiquidacionServiceImpl implements ProcesoLiquidacionService 
                 tipoProceso, anio, periodo, fechaInicio, fechaFin
         );
 
-        boolean existeActivo = procesoRepository.existsProcesoActivo(
-                empresaId, tipoProceso, anio, periodo, ESTADOS_ACTIVOS
-        );
+        boolean existeActivo;
+        if (tipoProceso == TipoProceso.NOMINA_QUINCENAL) {
+            existeActivo = procesoRepository.existsProcesoActivoConFecha(
+                    empresaId, tipoProceso, anio, periodo, fechaInicio, ESTADOS_ACTIVOS
+            );
+        } else {
+            existeActivo = procesoRepository.existsProcesoActivo(
+                    empresaId, tipoProceso, anio, periodo, ESTADOS_ACTIVOS
+            );
+        }
 
         if (existeActivo) {
             throw new ProcesoYaCerradoException(

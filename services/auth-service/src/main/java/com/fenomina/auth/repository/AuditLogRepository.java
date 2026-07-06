@@ -5,9 +5,11 @@ import com.fenomina.auth.enums.TipoAccionAudit;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -40,4 +42,23 @@ public interface AuditLogRepository extends JpaRepository<AuditLog, Long> {
     // Contar intentos fallidos recientes (últimos 30 minutos)
     @Query("SELECT COUNT(al) FROM AuditLog al WHERE al.username = :username AND al.accion = 'LOGIN_FAILED' AND al.timestamp > :desde")
     long countRecentFailedAttempts(@Param("username") String username, @Param("desde") LocalDateTime desde);
+
+    @Transactional
+    @Modifying
+    @Query("""
+    UPDATE AuditLog al SET al.usuarioId = NULL
+    WHERE al.usuarioId IN (
+        SELECT u.usuarioId FROM Usuario u
+        WHERE u.deletedAt IS NOT NULL
+        AND u.deletedAt < :limite
+    )
+    """)
+    int nullifyUsuarioIdForDeletedUsers(@Param("limite") LocalDateTime limite);
+
+    @Transactional
+    @Modifying
+    @Query("DELETE FROM AuditLog al WHERE al.timestamp < :limite")
+    int deleteLogsOlderThan(@Param("limite") LocalDateTime limite);
+
+
 }
