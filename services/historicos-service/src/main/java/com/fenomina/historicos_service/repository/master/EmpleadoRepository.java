@@ -31,4 +31,19 @@ public interface EmpleadoRepository extends JpaRepository<Empleado, Long> {
             @Param("estado") String estado,
             Pageable pageable
     );
+
+    @Query(value = """
+    SELECT
+        emp.empleado_id,
+        emp.documento_emp,
+        emp.nombres_emp,
+        emp.apellidos_emp,
+        emp.fecha_ingreso_emp
+    FROM master_data.empleado emp
+    WHERE emp.fk_id_empresa = :empresaId
+      AND emp.deleted_at IS NULL
+      AND emp.estado_emp = 'ACTIVO'
+    ORDER BY emp.apellidos_emp ASC
+    """, nativeQuery = true)
+    List<Object[]> findEmpleadosActivosPorEmpresa(@Param("empresaId") Long empresaId);
 }

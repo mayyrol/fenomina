@@ -3,6 +3,7 @@ package com.fenomina.historicos_service.service;
 import com.fenomina.historicos_service.config.ConceptoNominaIds;
 import com.fenomina.historicos_service.dto.conceptos.*;
 import com.fenomina.historicos_service.exception.AccesoNoAutorizadoException;
+import com.fenomina.historicos_service.repository.master.EmpleadoRepository;
 import com.fenomina.historicos_service.repository.payroll.NovedadRepository;
 import com.fenomina.historicos_service.repository.payroll.ReporteNominaDetalleRepository;
 import com.fenomina.historicos_service.security.SecurityUtils;
@@ -27,6 +28,7 @@ public class ReporteConceptosService {
 
     private final ReporteNominaDetalleRepository reporteNominaDetalleRepository;
     private final NovedadRepository novedadRepository;
+    private final EmpleadoRepository empleadoRepository;
 
     private static final List<Long> IDS_HORAS_RECARGOS = List.of(
             ConceptoNominaIds.RECARGO_NOCTURNO_LUN_SAB,
@@ -595,5 +597,77 @@ public class ReporteConceptosService {
         if (value instanceof LocalDate) return (LocalDate) value;
         if (value instanceof java.sql.Date) return ((java.sql.Date) value).toLocalDate();
         return LocalDate.parse(value.toString());
+    }
+
+    public List<ReporteProximasVacacionesDTO> getProximasVacaciones(Long empresaId) {
+
+        validarAccesoEmpresa(empresaId);
+
+        log.debug("Próximas vacaciones empresa={}", empresaId);
+
+        // 1. Traer últimas vacaciones agrupadas por empleado (solo los que tienen registro)
+        List<Object[]> rawVac = novedadRepository
+                .findUltimasVacacionesPorEmpresa(empresaId, IDS_VACACIONES);
+
+        // Quedarse solo con el año más reciente por empleado
+        // La query viene ordenada por apellido ASC y anio DESC
+        Map<Long, Object[]> ultimaVacPorEmpleado = new LinkedHashMap<>();
+        for (Object[] row : rawVac) {
+            Long empleadoId = toLong(row[0]);
+            ultimaVacPorEmpleado.putIfAbsent(empleadoId, row);
+        }
+
+        // 2. Traer todos los empleados activos
+        List<Object[]> todosEmpleados = empleadoRepository
+                .findEmpleadosActivosPorEmpresa(empresaId);
+
+        // 3. Construir un DTO por cada empleado
+        List<ReporteProximasVacacionesDTO> resultado = new ArrayList<>();
+
+        for (Object[] emp : todosEmpleados) {
+            Long empleadoId      = toLong(emp[0]);
+            String documento     = (String) emp[1];
+            String nombres       = (String) emp[2];
+            String apellidos     = (String) emp[3];
+            LocalDate fechaIngreso = toLocalDate(emp[4]);
+
+            if (ultimaVacPorEmpleado.containsKey(empleadoId)) {
+                // Empleado con vacaciones registradas
+                Object[] vac = ultimaVacPorEmpleado.get(empleadoId);
+                LocalDate fechaInicioUlt = toLocalDate(vac[6]);
+                LocalDate fechaFinUlt    = toLocalDate(vac[7]);
+                Integer anioUlt          = toInteger(vac[5]);
+
+                resultado.add(ReporteProximasVacacionesDTO.builder()
+                        .documentoEmp(documento)
+                        .nombresEmp(nombres)
+                        .apellidosEmp(apellidos)
+                        .fechaIngresoEmp(fechaIngreso)
+                        .anioUltimasVac(anioUlt)
+                        .fechaInicioUltimasVac(fechaInicioUlt)
+                        .fechaFinUltimasVac(fechaFinUlt)
+                        .proximaFechaVac(fechaInicioUlt.plusYears(1))
+                        .fuente("Desde últimas vacaciones")
+                        .build());
+            } else {
+                // Empleado sin vacaciones registradas — calcular desde fecha de ingreso
+                if (fechaIngreso == null) continue;
+
+                resultado.add(ReporteProximasVacacionesDTO.builder()
+                        .documentoEmp(documento)
+                        .nombresEmp(nombres)
+                        .apellidosEmp(apellidos)
+                        .fechaIngresoEmp(fechaIngreso)
+                        .anioUltimasVac(null)
+                        .fechaInicioUltimasVac(null)
+                        .fechaFinUltimasVac(null)
+                        .proximaFechaVac(fechaIngreso.plusYears(1))
+                        .fuente("Desde fecha de ingreso")
+                        .build());
+            }
+        }
+
+        resultado.sort(Comparator.comparing(ReporteProximasVacacionesDTO::getApellidosEmp));
+        return resultado;
     }
 }

@@ -88,4 +88,34 @@ public interface NovedadRepository extends JpaRepository<Novedad, Long> {
             @Param("nombres") String nombres,
             Pageable pageable
     );
+
+    @Query(value = """
+    SELECT
+        emp.empleado_id,
+        emp.documento_emp,
+        emp.nombres_emp,
+        emp.apellidos_emp,
+        emp.fecha_ingreso_emp,
+        nov.anio                      AS anio_ultimas_vac,
+        MIN(nov.fecha_inicio_ausen)   AS fecha_inicio_vac,
+        MAX(nov.fecha_fin_ausen)      AS fecha_fin_vac
+    FROM payroll.novedad nov
+    JOIN master_data.empleado emp
+        ON nov.fk_empleado_id = emp.empleado_id
+    JOIN payroll.proceso_liquidacion pl
+        ON nov.proceso_liquid = pl.proceso_liqui_id
+    WHERE emp.fk_id_empresa = :empresaId
+      AND nov.fk_concep_nomina_id IN (:vacacionIds)
+      AND emp.deleted_at IS NULL
+      AND pl.estado_proc_nomina IN ('PENDIENTE_PAGO', 'PAGADO')
+      AND nov.fecha_inicio_ausen IS NOT NULL
+    GROUP BY emp.empleado_id, emp.documento_emp, emp.nombres_emp,
+             emp.apellidos_emp, emp.fecha_ingreso_emp, nov.anio
+    ORDER BY emp.apellidos_emp ASC, nov.anio DESC
+    """, nativeQuery = true)
+    List<Object[]> findUltimasVacacionesPorEmpresa(
+            @Param("empresaId") Long empresaId,
+            @Param("vacacionIds") List<Long> vacacionIds
+    );
+
 }

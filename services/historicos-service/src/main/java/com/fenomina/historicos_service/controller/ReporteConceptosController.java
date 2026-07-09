@@ -10,6 +10,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
+
 @RestController
 @RequestMapping("/api/historicos/conceptos")
 @RequiredArgsConstructor
@@ -160,5 +162,13 @@ public class ReporteConceptosController {
         return ResponseEntity.ok(
                 reporteConceptosService.getVacacionesTotalEmpresa(
                         empresaId, anio, periodo, pageable));
+    }
+
+    @GetMapping("/proximas-vacaciones")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'RRHH', 'CLIENTE_EMPRESA')")
+    public ResponseEntity<List<ReporteProximasVacacionesDTO>> getProximasVacaciones(
+            @RequestParam Long empresaId) {
+        return ResponseEntity.ok(
+                reporteConceptosService.getProximasVacaciones(empresaId));
     }
 }
