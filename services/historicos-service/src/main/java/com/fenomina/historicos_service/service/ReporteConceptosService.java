@@ -605,38 +605,49 @@ public class ReporteConceptosService {
 
         log.debug("Próximas vacaciones empresa={}", empresaId);
 
-        // 1. Traer últimas vacaciones agrupadas por empleado (solo los que tienen registro)
         List<Object[]> rawVac = novedadRepository
                 .findUltimasVacacionesPorEmpresa(empresaId, IDS_VACACIONES);
 
-        // Quedarse solo con el año más reciente por empleado
-        // La query viene ordenada por apellido ASC y anio DESC
         Map<Long, Object[]> ultimaVacPorEmpleado = new LinkedHashMap<>();
         for (Object[] row : rawVac) {
             Long empleadoId = toLong(row[0]);
             ultimaVacPorEmpleado.putIfAbsent(empleadoId, row);
         }
 
-        // 2. Traer todos los empleados activos
         List<Object[]> todosEmpleados = empleadoRepository
                 .findEmpleadosActivosPorEmpresa(empresaId);
 
-        // 3. Construir un DTO por cada empleado
         List<ReporteProximasVacacionesDTO> resultado = new ArrayList<>();
 
         for (Object[] emp : todosEmpleados) {
-            Long empleadoId      = toLong(emp[0]);
-            String documento     = (String) emp[1];
-            String nombres       = (String) emp[2];
-            String apellidos     = (String) emp[3];
+            Long      empleadoId   = toLong(emp[0]);
+            String    documento    = (String) emp[1];
+            String    nombres      = (String) emp[2];
+            String    apellidos    = (String) emp[3];
             LocalDate fechaIngreso = toLocalDate(emp[4]);
 
+            if (fechaIngreso == null) continue;
+
+            LocalDate hoy = LocalDate.now();
+            LocalDate proximaFecha;
+            try {
+                proximaFecha = LocalDate.of(hoy.getYear(), fechaIngreso.getMonth(), fechaIngreso.getDayOfMonth());
+            } catch (java.time.DateTimeException e) {
+                proximaFecha = LocalDate.of(hoy.getYear(), fechaIngreso.getMonth(), 28);
+            }
+            if (!proximaFecha.isAfter(hoy)) {
+                try {
+                    proximaFecha = LocalDate.of(hoy.getYear() + 1, fechaIngreso.getMonth(), fechaIngreso.getDayOfMonth());
+                } catch (java.time.DateTimeException e) {
+                    proximaFecha = LocalDate.of(hoy.getYear() + 1, fechaIngreso.getMonth(), 28);
+                }
+            }
+
             if (ultimaVacPorEmpleado.containsKey(empleadoId)) {
-                // Empleado con vacaciones registradas
-                Object[] vac = ultimaVacPorEmpleado.get(empleadoId);
+                Object[]  vac            = ultimaVacPorEmpleado.get(empleadoId);
                 LocalDate fechaInicioUlt = toLocalDate(vac[6]);
                 LocalDate fechaFinUlt    = toLocalDate(vac[7]);
-                Integer anioUlt          = toInteger(vac[5]);
+                Integer   anioUlt        = toInteger(vac[5]);
 
                 resultado.add(ReporteProximasVacacionesDTO.builder()
                         .documentoEmp(documento)
@@ -646,13 +657,10 @@ public class ReporteConceptosService {
                         .anioUltimasVac(anioUlt)
                         .fechaInicioUltimasVac(fechaInicioUlt)
                         .fechaFinUltimasVac(fechaFinUlt)
-                        .proximaFechaVac(fechaInicioUlt.plusYears(1))
-                        .fuente("Desde últimas vacaciones")
+                        .proximaFechaVac(proximaFecha)
+                        .fuente("Desde fecha de ingreso")
                         .build());
             } else {
-                // Empleado sin vacaciones registradas — calcular desde fecha de ingreso
-                if (fechaIngreso == null) continue;
-
                 resultado.add(ReporteProximasVacacionesDTO.builder()
                         .documentoEmp(documento)
                         .nombresEmp(nombres)
@@ -661,7 +669,7 @@ public class ReporteConceptosService {
                         .anioUltimasVac(null)
                         .fechaInicioUltimasVac(null)
                         .fechaFinUltimasVac(null)
-                        .proximaFechaVac(fechaIngreso.plusYears(1))
+                        .proximaFechaVac(proximaFecha)
                         .fuente("Desde fecha de ingreso")
                         .build());
             }
