@@ -38,3 +38,7 @@ dist/
 # Credenciales
 **/application.properties
 **/application.yml
+
+docker-compose.yml
+Dockerfile.*
+init.sql
