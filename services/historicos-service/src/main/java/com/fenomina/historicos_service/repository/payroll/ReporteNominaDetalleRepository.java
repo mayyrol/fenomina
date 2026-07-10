@@ -20,33 +20,34 @@ public interface ReporteNominaDetalleRepository extends JpaRepository<ReporteNom
     @Query(value = """
 
             SELECT
-            emp.documento_emp,
-            emp.nombres_emp,
-            emp.apellidos_emp,
-            (SELECT rnd2.base_calculo_concept
-             FROM payroll.reporte_nomina_detalle rnd2
-             WHERE rnd2.fk_cabec_nomina_id = nc.cabec_nomina_id
-               AND rnd2.fk_concep_nomina_id = 1
-             LIMIT 1) AS salario_basc_mensual,
-            nc.anio_cabec_nomina AS anio,
-            nc.periodo_coti_nomina AS periodo,
-            nc.total_devengado_emp,
-            nc.total_deduccion_emp,
-            nc.neto_nomina_emp,
-            pl.estado_proc_nomina AS estado_proceso
-        FROM payroll.nomina_cabecera nc
-        JOIN master_data.empleado emp ON nc.fk_empleado_id = emp.empleado_id
-        JOIN payroll.proceso_liquidacion pl ON nc.fk_proceso_liqui_id = pl.proceso_liqui_id
-        WHERE pl.fk_id_empresa = :empresaId
-          AND nc.deleted_at IS NULL
-          AND pl.estado_proc_nomina IN ('PENDIENTE_PAGO', 'PAGADO')
-          AND emp.deleted_at IS NULL
-          AND (:anio IS NULL OR nc.anio_cabec_nomina = :anio)
-          AND (:periodo IS NULL OR nc.periodo_coti_nomina = :periodo)
-          AND (:documento IS NULL OR emp.documento_emp LIKE CONCAT('%', CAST(:documento AS TEXT), '%'))
-          AND (:nombres IS NULL OR LOWER(CONCAT(emp.nombres_emp, ' ', emp.apellidos_emp))
-               LIKE LOWER(CONCAT('%', CAST(:nombres AS TEXT), '%')))
-        ORDER BY emp.apellidos_emp ASC, nc.anio_cabec_nomina DESC
+                emp.documento_emp,
+                emp.nombres_emp,
+                emp.apellidos_emp,
+                emp.salario_basc_mensual,
+                nc.anio_cabec_nomina        AS anio,
+                nc.periodo_coti_nomina      AS periodo,
+                nc.total_devengado_emp,
+                nc.total_deduccion_emp,
+                nc.neto_nomina_emp,
+                (SELECT rnd2.cantidad_concept
+                 FROM payroll.reporte_nomina_detalle rnd2
+                 WHERE rnd2.fk_cabec_nomina_id = nc.cabec_nomina_id
+                   AND rnd2.fk_concep_nomina_id = 1
+                 LIMIT 1) AS dias_laborados,
+                pl.estado_proc_nomina AS estado_proceso
+            FROM payroll.nomina_cabecera nc
+            JOIN master_data.empleado emp ON nc.fk_empleado_id = emp.empleado_id
+            JOIN payroll.proceso_liquidacion pl ON nc.fk_proceso_liqui_id = pl.proceso_liqui_id
+            WHERE pl.fk_id_empresa = :empresaId
+              AND nc.deleted_at IS NULL
+              AND pl.estado_proc_nomina IN ('PENDIENTE_PAGO', 'PAGADO')
+              AND emp.deleted_at IS NULL
+              AND (:anio IS NULL OR nc.anio_cabec_nomina = :anio)
+              AND (:periodo IS NULL OR nc.periodo_coti_nomina = :periodo)
+              AND (:documento IS NULL OR emp.documento_emp LIKE CONCAT('%', CAST(:documento AS TEXT), '%'))
+              AND (:nombres IS NULL OR LOWER(CONCAT(emp.nombres_emp, ' ', emp.apellidos_emp))
+                   LIKE LOWER(CONCAT('%', CAST(:nombres AS TEXT), '%')))
+            ORDER BY emp.apellidos_emp ASC, nc.anio_cabec_nomina DESC
         """,
             countQuery = """
         SELECT COUNT(nc.cabec_nomina_id)

@@ -224,7 +224,6 @@ public class ReporteNominaService {
     }
 
     private ReporteNominaEmpleadosDTO mapReporteNominaEmpleados(Object[] row) {
-        // Orden según SELECT en findReporteNominaEmpleados:
         // [0] documento_emp
         // [1] nombres_emp
         // [2] apellidos_emp
@@ -234,7 +233,8 @@ public class ReporteNominaService {
         // [6] total_devengado_emp
         // [7] total_deduccion_emp
         // [8] neto_nomina_emp
-        // La posición [9] es estado_proceso
+        // [9] dias_laborados
+        // [10] estado_proceso
         return ReporteNominaEmpleadosDTO.builder()
                 .documentoEmp((String) row[0])
                 .nombresEmp((String) row[1])
@@ -245,7 +245,8 @@ public class ReporteNominaService {
                 .totalDevengado(toBigDecimal(row[6]))
                 .totalDeducciones(toBigDecimal(row[7]))
                 .netoNomina(toBigDecimal(row[8]))
-                .estadoProceso((String) row[9])
+                .diasLaborados(toInteger(row[9]))
+                .estadoProceso((String) row[10])
                 .build();
     }
 
