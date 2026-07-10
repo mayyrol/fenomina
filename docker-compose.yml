@@ -1,0 +1,215 @@
+# ============================================================
+# docker-compose.yml — Fenomina Microservices
+# Ubicación: raíz del proyecto fenomina/
+# ============================================================
+
+services:
+
+  # ── PostgreSQL ──────────────────────────────────────────────
+  postgres:
+    image: postgres:15-alpine
+    container_name: fenomina-postgres
+    restart: always
+    environment:
+      POSTGRES_DB: fendatabase
+      POSTGRES_USER: adminpg123
+      POSTGRES_PASSWORD: clavepg123
+      PGDATA: /var/lib/postgresql/data/pgdata
+    volumes:
+      # Datos persistentes — sobreviven al recrear el contenedor
+      - postgres_data:/var/lib/postgresql/data
+      # Script de inicialización — solo se ejecuta la primera vez
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    ports:
+      - "5433:5432"
+    networks:
+      - fenomina-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U adminpg123 -d fendatabase"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  # ── API Gateway ─────────────────────────────────────────────
+  api-gateway:
+    build:
+      context: .
+      dockerfile: Dockerfile.gateway
+    container_name: fenomina-gateway
+    restart: always
+    ports:
+      - "8090:8090"
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      SERVER_PORT: 8090
+      JWT_SECRET: wh5dSMFcOz9VnSE1mPyyc6PJbycLKODqRspjclNigC11zrYKPYgTv1WX6uil2r40SCJVtPS8Twy1P6MhiSJfewWUwXmVJttHVxAsRGxmLFC1HJYbHnoBFEOxswUL3lIo8tAUOBBnevGtJErxLjhz7LB9RrFxvLxZ
+      # URIs internas — servicios se llaman por nombre de contenedor
+      GATEWAY_ROUTE_AUTH_URI: http://auth-service:8081
+      GATEWAY_ROUTE_MASTER_URI: http://master-data-service:8082
+      GATEWAY_ROUTE_PAYROLL_URI: http://payroll-engine:8083
+      GATEWAY_ROUTE_HISTORICOS_URI: http://historicos-service:8084
+    depends_on:
+      auth-service:
+        condition: service_healthy
+      master-data-service:
+        condition: service_healthy
+      payroll-engine:
+        condition: service_healthy
+      historicos-service:
+        condition: service_healthy
+    networks:
+      - fenomina-network
+
+  # ── Auth Service ────────────────────────────────────────────
+  auth-service:
+    build:
+      context: .
+      dockerfile: Dockerfile.auth
+    container_name: fenomina-auth
+    restart: always
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/fendatabase
+      SPRING_DATASOURCE_USERNAME: adminpg123
+      SPRING_DATASOURCE_PASSWORD: clavepg123
+      SPRING_JPA_HIBERNATE_DDL_AUTO: validate
+      SERVER_PORT: 8081
+      JWT_SECRET: wh5dSMFcOz9VnSE1mPyyc6PJbycLKODqRspjclNigC11zrYKPYgTv1WX6uil2r40SCJVtPS8Twy1P6MhiSJfewWUwXmVJttHVxAsRGxmLFC1HJYbHnoBFEOxswUL3lIo8tAUOBBnevGtJErxLjhz7LB9RrFxvLxZ
+      JWT_EXPIRATION: 7200000
+      JWT_REFRESH_EXPIRATION: 604800000
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - fenomina-network
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8081/actuator/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  # ── Master Data Service ─────────────────────────────────────
+  master-data-service:
+    build:
+      context: .
+      dockerfile: Dockerfile.master
+    container_name: fenomina-master
+    restart: always
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/fendatabase
+      SPRING_DATASOURCE_USERNAME: adminpg123
+      SPRING_DATASOURCE_PASSWORD: clavepg123
+      SPRING_JPA_HIBERNATE_DDL_AUTO: validate
+      SERVER_PORT: 8082
+      JWT_SECRET: wh5dSMFcOz9VnSE1mPyyc6PJbycLKODqRspjclNigC11zrYKPYgTv1WX6uil2r40SCJVtPS8Twy1P6MhiSJfewWUwXmVJttHVxAsRGxmLFC1HJYbHnoBFEOxswUL3lIo8tAUOBBnevGtJErxLjhz7LB9RrFxvLxZ
+      JWT_EXPIRATION: 7200000
+      INTERNAL_API_KEY: fen-internal-key-2026
+      # Ruta de uploads dentro del contenedor
+      FILE_UPLOAD_DIR: /app/uploads/logos
+    volumes:
+      # Logos persistentes en disco del servidor
+      - uploads_logos:/app/uploads/logos
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - fenomina-network
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8082/actuator/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  # ── Payroll Engine ──────────────────────────────────────────
+  payroll-engine:
+    build:
+      context: .
+      dockerfile: Dockerfile.payroll
+    container_name: fenomina-payroll
+    restart: always
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/fendatabase
+      SPRING_DATASOURCE_USERNAME: adminpg123
+      SPRING_DATASOURCE_PASSWORD: clavepg123
+      SPRING_JPA_HIBERNATE_DDL_AUTO: validate
+      SERVER_PORT: 8083
+      JWT_SECRET: wh5dSMFcOz9VnSE1mPyyc6PJbycLKODqRspjclNigC11zrYKPYgTv1WX6uil2r40SCJVtPS8Twy1P6MhiSJfewWUwXmVJttHVxAsRGxmLFC1HJYbHnoBFEOxswUL3lIo8tAUOBBnevGtJErxLjhz7LB9RrFxvLxZ
+      JWT_EXPIRATION: 7200000
+      INTERNAL_API_KEY: fen-internal-key-2026
+      # URL del master-data dentro de la red Docker
+      SERVICES_MASTERDATA_URL: http://master-data-service:8082
+    depends_on:
+      postgres:
+        condition: service_healthy
+      master-data-service:
+        condition: service_healthy
+    networks:
+      - fenomina-network
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8083/actuator/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  # ── Historicos Service ──────────────────────────────────────
+  historicos-service:
+    build:
+      context: .
+      dockerfile: Dockerfile.historicos
+    container_name: fenomina-historicos
+    restart: always
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/fendatabase
+      SPRING_DATASOURCE_USERNAME: adminpg123
+      SPRING_DATASOURCE_PASSWORD: clavepg123
+      SPRING_JPA_HIBERNATE_DDL_AUTO: validate
+      SERVER_PORT: 8084
+      JWT_SECRET: wh5dSMFcOz9VnSE1mPyyc6PJbycLKODqRspjclNigC11zrYKPYgTv1WX6uil2r40SCJVtPS8Twy1P6MhiSJfewWUwXmVJttHVxAsRGxmLFC1HJYbHnoBFEOxswUL3lIo8tAUOBBnevGtJErxLjhz7LB9RrFxvLxZ
+      JWT_EXPIRATION: 7200000
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - fenomina-network
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8084/actuator/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  # ── Frontend ────────────────────────────────────────────────
+  frontend:
+    build:
+      context: C:/Users/yinet/Downloads/fenomina-Frontend
+      dockerfile: C:/Users/yinet/IdeaProjects/fenomina/Dockerfile.frontend
+      args:
+        VITE_GATEWAY_URL: http://192.168.101.10:8090 #cambiar segun cambio de red y/o equipo -- 172.23.1.10 -- CAMBIAR ANTES DE GENERAR IMAGEN DE PRODUCCION
+        VITE_INTERNAL_API_KEY: fen-internal-key-2026
+    container_name: fenomina-frontend
+    restart: always
+    ports:
+      - "80:80"
+    depends_on:
+      - api-gateway
+    networks:
+      - fenomina-network
+
+# ── Volúmenes persistentes ───────────────────────────────────
+volumes:
+  postgres_data:
+    driver: local
+  uploads_logos:
+    driver: local
+
+# ── Red interna ──────────────────────────────────────────────
+networks:
+  fenomina-network:
+    driver: bridge
