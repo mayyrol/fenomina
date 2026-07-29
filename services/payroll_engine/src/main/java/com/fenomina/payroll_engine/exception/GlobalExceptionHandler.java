@@ -99,6 +99,14 @@ public class GlobalExceptionHandler {
                 "Error interno del servidor");
     }
 
+    @ExceptionHandler(SinCorreosRegistradosException.class)
+    public ResponseEntity<Map<String, Object>> handleSinCorreosRegistrados(
+            SinCorreosRegistradosException ex
+    ) {
+        log.warn("Envío bloqueado, sin correos registrados: {}", ex.getMessage());
+        return buildResponse(HttpStatus.UNPROCESSABLE_ENTITY, ex.getMessage());
+    }
+
     private ResponseEntity<Map<String, Object>> buildResponse(
             HttpStatus status,
             String mensaje

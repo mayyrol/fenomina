@@ -1,12 +1,15 @@
 package com.fenomina.payroll_engine.controller;
 
-import com.fenomina.payroll_engine.client.dto.ContratoConceptoDTO;
 import com.fenomina.payroll_engine.client.dto.ParametroGeneralDTO;
 import com.fenomina.payroll_engine.dto.response.DesprendiblePrestacionResponseDTO;
 import com.fenomina.payroll_engine.dto.response.DesprendibleResponseDTO;
+import com.fenomina.payroll_engine.dto.response.EnvioDesprendibleResponseDTO;
+import com.fenomina.payroll_engine.dto.response.PreviewEnvioResponseDTO;
 import com.fenomina.payroll_engine.entity.*;
 import com.fenomina.payroll_engine.repository.CabeceraLiquiPrestacionRepository;
 import com.fenomina.payroll_engine.repository.DetalleLiquiPrestacionRepository;
+import com.fenomina.payroll_engine.security.SecurityUtils;
+import com.fenomina.payroll_engine.service.proceso.EnvioDesprendibleService;
 import com.fenomina.payroll_engine.service.proceso.ProcesoLiquidacionService;
 import com.fenomina.payroll_engine.client.MasterDataClientWrapper;
 import com.fenomina.payroll_engine.client.dto.ConceptoNominaDTO;
@@ -15,9 +18,11 @@ import com.fenomina.payroll_engine.repository.NominaCabeceraRepository;
 import com.fenomina.payroll_engine.repository.ReporteNominaDetalleRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -37,6 +42,7 @@ public class DesprendibleController {
     private final MasterDataClientWrapper masterDataClient;
     private final CabeceraLiquiPrestacionRepository cabeceraLiquiPrestacionRepository;
     private final DetalleLiquiPrestacionRepository detalleLiquiPrestacionRepository;
+    private final EnvioDesprendibleService envioDesprendibleService;
 
     @GetMapping("/nomina/{procesoId}")
     @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'RRHH', 'CLIENTE_EMPRESA', 'AUDITOR')")
@@ -386,5 +392,29 @@ public class DesprendibleController {
                 "fechaInicio", fechaInicio.toString(),
                 "fechaFin", fechaFin.toString()
         ));
+    }
+
+    @GetMapping("/{procesoId}/preview-envio")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'RRHH')")
+    public ResponseEntity<PreviewEnvioResponseDTO> previewEnvio(
+            @PathVariable("procesoId") Long procesoId
+    ) {
+        log.debug("Generando preview de envío - proceso: {}", procesoId);
+        return ResponseEntity.ok(envioDesprendibleService.obtenerPreview(procesoId));
+    }
+
+    @PostMapping(value = "/{procesoId}/enviar", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'RRHH')")
+    public ResponseEntity<EnvioDesprendibleResponseDTO> enviarDesprendibles(
+            @PathVariable("procesoId") Long procesoId,
+            @RequestPart("desprendiblePdf") MultipartFile desprendiblePdf
+    ) {
+        Long usuarioId = SecurityUtils.getCurrentUserId();
+        log.info("Solicitud de envío de desprendibles - proceso: {}, usuario: {}", procesoId, usuarioId);
+
+        EnvioDesprendibleResponseDTO response =
+                envioDesprendibleService.enviar(procesoId, usuarioId, desprendiblePdf);
+
+        return ResponseEntity.ok(response);
     }
 }

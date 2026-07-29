@@ -1,4 +1,8 @@
 package com.fenomina.payroll_engine.enums;
 
 public enum EstadoEnvio {
+    PENDIENTE,
+    ENVIADO,
+    PARCIAL,
+    FALLIDO
 }

@@ -1,5 +1,7 @@
 package com.fenomina.payroll_engine.client.dto;
 
+import java.util.List;
+
 public record EmpresaDTO(
         Long empresaId,
         String empresaNit,
@@ -8,5 +10,6 @@ public record EmpresaDTO(
         Boolean esExoneradaLey1607,
         Boolean aplicaNomina,
         Boolean aplicaPrima,
-        Boolean aplicaCesantias
+        Boolean aplicaCesantias,
+        List<EmpresaCorreoDTO> correos
 ) {}
