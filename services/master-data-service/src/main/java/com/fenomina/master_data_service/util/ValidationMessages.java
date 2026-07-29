@@ -12,6 +12,7 @@ public final class ValidationMessages {
     public static final String EMPRESA_RAZON_SOCIAL_REQUIRED = "La razón social es obligatoria";
     public static final String EMPRESA_NOMBRE_REQUIRED = "El nombre de la empresa es obligatorio";
     public static final String EMPRESA_NOT_FOUND = "Empresa no encontrada";
+    public static final String EMPRESA_CORREO_DUPLICADO = "Ya existe un correo registrado igual para esta empresa.";
 
     // Empleado
     public static final String EMPLEADO_DOCUMENTO_REQUIRED = "El documento del empleado es obligatorio";

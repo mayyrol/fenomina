@@ -1,6 +1,9 @@
 package com.fenomina.master_data_service.dto.response;
 
+import com.fenomina.master_data_service.dto.request.EmpresaCorreoDTO;
+
 import java.time.LocalDateTime;
+import java.util.List;
 
 public record EmpresaResponseDTO(
         Long empresaId,
@@ -12,6 +15,7 @@ public record EmpresaResponseDTO(
         Boolean aplicaNomina,
         Boolean aplicaPrima,
         Boolean aplicaCesantias,
+        List<EmpresaCorreoDTO> correos,
         LocalDateTime createdAt,
         LocalDateTime updatedAt
 ) {

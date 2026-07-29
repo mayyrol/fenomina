@@ -6,7 +6,6 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.validation.FieldError;
-import org.springframework.web.ErrorResponse;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -73,7 +72,8 @@ public class GlobalExceptionHandler {
     @ExceptionHandler({
             DuplicateNitException.class,
             DuplicateDocumentException.class,
-            DuplicateContratoConceptoException.class
+            DuplicateContratoConceptoException.class,
+            DuplicateCorreoException.class
     })
     public ResponseEntity<Map<String, Object>> handleDuplicateExceptions(
             RuntimeException ex,
@@ -242,4 +242,6 @@ public class GlobalExceptionHandler {
 
         return ResponseEntity.status(HttpStatus.CONFLICT).body(response);
     }
+
+
 }

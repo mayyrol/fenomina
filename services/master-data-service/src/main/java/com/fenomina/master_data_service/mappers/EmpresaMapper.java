@@ -26,6 +26,7 @@ public interface EmpresaMapper {
     @Mapping(target = "deletedAt", ignore = true)
     Empresa toEntity(EmpresaRequestDTO dto);
 
+    @Mapping(target = "correos", ignore = true)
     EmpresaResponseDTO toResponseDTO(Empresa empresa);
 
     List<EmpresaResponseDTO> toResponseDTOList(List<Empresa> empresas);
