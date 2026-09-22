@@ -21,6 +21,7 @@ public class ReporteCesantiasEmpresaDTO {
     private LocalDate fechaInicioCorte;
     private LocalDate fechaFinCorte;
     private Integer diasLiquidados;
+    private Integer diasParaFormula;
     private BigDecimal salarioBase;
     private Boolean tieneAuxTransporte;
     private BigDecimal salarioFijoMomento;

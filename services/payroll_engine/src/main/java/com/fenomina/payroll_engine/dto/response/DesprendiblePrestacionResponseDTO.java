@@ -22,6 +22,7 @@ public class DesprendiblePrestacionResponseDTO {
     private final LocalDate fechaInicioCorte;
     private final LocalDate fechaFinCorte;
     private final Integer diasLiquidados;
+    private final Integer diasParaFormula;
     private final BigDecimal salarioBase;
     private final BigDecimal auxTransporte;
     private final BigDecimal baseLiquidacion;

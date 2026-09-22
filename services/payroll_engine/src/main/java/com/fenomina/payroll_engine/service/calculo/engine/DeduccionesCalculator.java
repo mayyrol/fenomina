@@ -169,12 +169,25 @@ public class DeduccionesCalculator {
                             diasLnr))
                     .build());
 
+            BigDecimal descuentoAux = BigDecimal.ZERO;
+            if (Boolean.TRUE.equals(ctx.getEmpleado().tieneAuxTransporte())) {
+                BigDecimal auxTransporte = ctx.getParametrosPorNombre()
+                        .get("AUXILIO_TRANSPORTE").valorParamGeneral();
+                BigDecimal auxDia = auxTransporte
+                        .divide(DIAS_MES, ESCALA, RoundingMode.HALF_UP);
+                descuentoAux = auxDia
+                        .multiply(BigDecimal.valueOf(diasLnr))
+                        .setScale(ESCALA, RoundingMode.HALF_UP);
+            }
+
+            BigDecimal valorTotalDescuentoLnr = valorDescuentoLnr.add(descuentoAux);
+
             aportes.add(DeduccionCalculada.builder()
                     .nombreConcepto("Licencias no remuneradas")
                     .baseCalculo(ctx.getEmpleado().salarioBascMensual())
                     .porcentaje(null)
                     .cantidad(BigDecimal.valueOf(diasLnr))
-                    .valorResultado(valorDescuentoLnr)
+                    .valorResultado(valorTotalDescuentoLnr)
                     .esAporteLicenciaNoRemunerada(false)
                     .build());
         }

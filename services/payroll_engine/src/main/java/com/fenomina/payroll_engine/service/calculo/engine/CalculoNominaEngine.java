@@ -157,13 +157,12 @@ public class CalculoNominaEngine {
         int maximoPeriodo = proceso.getTipoProceso() ==
                 com.fenomina.payroll_engine.enums.TipoProceso.NOMINA_QUINCENAL ? 15 : 30;
 
-        if (diasAusencia > 0 && (diasLaborados + diasAusencia) > maximoPeriodo) {
+        if (diasLaborados > maximoPeriodo) {
             throw new CalculoNominaException(
                     String.format(
-                            "Empleado %d: la suma de días laborados ingresados (%d) y días de " +
-                                    "ausencia registrados en novedades (%d) supera el máximo del período " +
+                            "Empleado %d: los días laborados ingresados (%d) superan el máximo del período " +
                                     "(%d días). Verifique los días laborados ingresados.",
-                            empleadoId, diasLaborados, diasAusencia, maximoPeriodo
+                            empleadoId, diasLaborados, maximoPeriodo
                     )
             );
         }

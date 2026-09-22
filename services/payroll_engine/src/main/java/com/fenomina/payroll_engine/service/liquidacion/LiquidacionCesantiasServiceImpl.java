@@ -194,6 +194,19 @@ public class LiquidacionCesantiasServiceImpl implements LiquidacionCesantiasServ
             diasLiquidados = Math.min(diasLiquidados, DIAS_ANIO);
         }
 
+        int diasLnr = nominasAnio.stream()
+                .mapToInt(nc -> reporteNominaDetalleRepository
+                        .findByFkCabecNominaId(nc.getCabecNominaId())
+                        .stream()
+                        .filter(d -> d.getFkConcepNominaId() != null
+                                && d.getFkConcepNominaId().equals(15L))
+                        .mapToInt(d -> d.getCantidadConcept() != null
+                                ? d.getCantidadConcept().intValue() : 0)
+                        .sum())
+                .sum();
+
+        int diasParaFormula = Math.max(0, diasLiquidados - diasLnr);
+
         int diasCalendarioVinculado = LiquidacionFechaUtils.calcularDias(fechaInicioReal, fechaFinPeriodo);
         diasCalendarioVinculado = Math.min(diasCalendarioVinculado, DIAS_ANIO);
 
@@ -207,11 +220,11 @@ public class LiquidacionCesantiasServiceImpl implements LiquidacionCesantiasServ
 
 // Fórmula cesantías: base × días / 360
         BigDecimal valorCesantias = baseLiquidacion
-                .multiply(BigDecimal.valueOf(diasLiquidados))
+                .multiply(BigDecimal.valueOf(diasParaFormula))   // ← diasParaFormula
                 .divide(BigDecimal.valueOf(DIAS_ANIO), ESCALA, RoundingMode.HALF_UP);
 
         BigDecimal valorIntereses = valorCesantias
-                .multiply(BigDecimal.valueOf(diasLiquidados))
+                .multiply(BigDecimal.valueOf(diasParaFormula))   // ← diasParaFormula
                 .multiply(new BigDecimal("0.12"))
                 .divide(BigDecimal.valueOf(DIAS_ANIO), ESCALA, RoundingMode.HALF_UP);
 
@@ -227,7 +240,7 @@ public class LiquidacionCesantiasServiceImpl implements LiquidacionCesantiasServ
                         ? conceptoCesantias.concepNominaId() : null)
                 .fechaInicioCorteEmp(fechaInicioReal)
                 .fechaFinCorteEmp(fechaFinPeriodo)
-                .diasLiquidadosInt(diasLiquidados)
+                .diasLiquidadosInt(diasParaFormula)
                 .salarioFijoMomento(salarioPromedio)
                 .promedioAuxTransporte(auxPromedio)
                 .baseLiquiTotal(baseLiquidacion)

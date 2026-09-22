@@ -20,6 +20,7 @@ public class ReportePrimaEmpresaDTO {
     private LocalDate fechaInicioCorte;
     private LocalDate fechaFinCorte;
     private Integer diasLiquidados;
+    private Integer diasParaFormula;
     private BigDecimal salarioBase;
     private Boolean tieneAuxTransporte;
     private BigDecimal promedioVarPeriodo; // otros: horas extra + bonificaciones

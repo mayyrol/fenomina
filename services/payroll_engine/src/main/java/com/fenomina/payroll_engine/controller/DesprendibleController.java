@@ -355,6 +355,19 @@ public class DesprendibleController {
                 })
                 .sum();
 
+        int diasLnr = cabeceras.stream()
+                .mapToInt(cabecera -> {
+                    List<ReporteNominaDetalle> detalles = reporteNominaDetalleRepository
+                            .findByFkCabecNominaId(cabecera.getCabecNominaId());
+                    return detalles.stream()
+                            .filter(d -> d.getFkConcepNominaId() != null && d.getFkConcepNominaId().equals(15L))
+                            .mapToInt(d -> d.getCantidadConcept() != null ? d.getCantidadConcept().intValue() : 0)
+                            .sum();
+                })
+                .sum();
+
+        int diasParaFormula = Math.max(0, diasLaborados - diasLnr);
+
         // Conceptos variables del semestre (excluir salario base, deducciones y aportes patronales)
         List<Long> CONCEPTOS_EXCLUIDOS = List.of(1L, 16L, 22L, 23L, 32L, 33L, 34L, 35L, 36L,
                 37L, 38L, 39L, 40L, 41L, 42L, 43L, 44L, 45L, 46L, 47L);
@@ -388,6 +401,7 @@ public class DesprendibleController {
 
         return ResponseEntity.ok(Map.of(
                 "diasLaborados", diasLaborados,
+                "diasParaFormula", diasParaFormula,
                 "novedades", novedades,
                 "fechaInicio", fechaInicio.toString(),
                 "fechaFin", fechaFin.toString()

@@ -202,6 +202,19 @@ public class LiquidacionPrimaServiceImpl implements LiquidacionPrimaService {
             diasLiquidados = Math.min(diasLiquidados, DIAS_SEMESTRE);
         }
 
+        int diasLnr = nominasSemestre.stream()
+        .mapToInt(nc -> reporteNominaDetalleRepository
+                .findByFkCabecNominaId(nc.getCabecNominaId())
+                .stream()
+                .filter(d -> d.getFkConcepNominaId() != null
+                        && d.getFkConcepNominaId().equals(15L))
+                .mapToInt(d -> d.getCantidadConcept() != null
+                        ? d.getCantidadConcept().intValue() : 0)
+                .sum())
+        .sum();
+
+        int diasParaFormula = Math.max(0, diasLiquidados - diasLnr);
+
         int diasCalendarioVinculado = LiquidacionFechaUtils.calcularDias(fechaInicioReal, fechaFinPeriodo);
         diasCalendarioVinculado = Math.min(diasCalendarioVinculado, DIAS_SEMESTRE);
 
@@ -215,7 +228,7 @@ public class LiquidacionPrimaServiceImpl implements LiquidacionPrimaService {
 
         // Fórmula prima: base × días / 360
         BigDecimal valorPrima = baseLiquidacion
-                .multiply(BigDecimal.valueOf(diasLiquidados))
+                .multiply(BigDecimal.valueOf(diasParaFormula))
                 .divide(BigDecimal.valueOf(DIAS_ANIO), ESCALA, RoundingMode.HALF_UP);
 
         ConceptoNominaDTO conceptoPrima = conceptosPorNombre.get("Prima de servicios");
@@ -227,7 +240,7 @@ public class LiquidacionPrimaServiceImpl implements LiquidacionPrimaService {
                         ? conceptoPrima.concepNominaId() : null)
                 .fechaInicioCorteEmp(fechaInicioReal)
                 .fechaFinCorteEmp(fechaFinPeriodo)
-                .diasLiquidadosInt(diasLiquidados)
+                .diasLiquidadosInt(diasParaFormula)
                 .salarioFijoMomento(salarioPromedio)
                 .promedioAuxTransporte(auxPromedio)
                 .baseLiquiTotal(baseLiquidacion)
